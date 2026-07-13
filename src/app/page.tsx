@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { supabase } from "@/lib/supabase";
 
 type Organization =
   | "Cuórum de Élderes"
@@ -12,58 +19,24 @@ type Organization =
 
 type Member = {
   id: string;
-  fullName: string;
-  familyName: string;
+  full_name: string;
+  family_name: string | null;
   organization: Organization;
+  recent_convert: boolean;
+  active: boolean;
+  created_at: string;
 };
 
-type AttendanceRecord = {
-  [date: string]: string[];
+type Meeting = {
+  id: string;
+  meeting_date: string;
+};
+
+type AttendanceRow = {
+  member_id: string;
 };
 
 type Tab = "attendance" | "summary" | "members";
-
-const STORAGE_MEMBERS = "ward-members";
-const STORAGE_ATTENDANCE = "ward-attendance";
-
-const demoMembers: Member[] = [
-  {
-    id: "1",
-    fullName: "Carlos García",
-    familyName: "Familia García",
-    organization: "Cuórum de Élderes",
-  },
-  {
-    id: "2",
-    fullName: "Ana García",
-    familyName: "Familia García",
-    organization: "Sociedad de Socorro",
-  },
-  {
-    id: "3",
-    fullName: "Sofía García",
-    familyName: "Familia García",
-    organization: "Mujeres Jóvenes",
-  },
-  {
-    id: "4",
-    fullName: "José López",
-    familyName: "Familia López",
-    organization: "Cuórum de Élderes",
-  },
-  {
-    id: "5",
-    fullName: "María López",
-    familyName: "Familia López",
-    organization: "Sociedad de Socorro",
-  },
-  {
-    id: "6",
-    fullName: "Daniel López",
-    familyName: "Familia López",
-    organization: "Primaria",
-  },
-];
 
 function getMostRecentSunday(): string {
   const date = new Date();
@@ -74,246 +47,620 @@ function getMostRecentSunday(): string {
   return date.toISOString().slice(0, 10);
 }
 
-function createId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
+function formatDate(dateValue: string): string {
+  if (!dateValue) return "";
 
-  return `${Date.now()}-${Math.random()}`;
+  return new Intl.DateTimeFormat("es-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${dateValue}T12:00:00Z`));
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<Tab>("attendance");
+  const [activeTab, setActiveTab] =
+    useState<Tab>("attendance");
+
   const [members, setMembers] = useState<Member[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceRecord>({});
-  const [meetingDate, setMeetingDate] = useState(getMostRecentSunday());
-  const [attendanceSearch, setAttendanceSearch] = useState("");
+  const [presentMemberIds, setPresentMemberIds] =
+    useState<Set<string>>(new Set());
+
+  const [meetingDate, setMeetingDate] = useState(
+    getMostRecentSunday(),
+  );
+
+  const [meetingId, setMeetingId] =
+    useState<string | null>(null);
+
+  const [attendanceSearch, setAttendanceSearch] =
+    useState("");
+
   const [memberSearch, setMemberSearch] = useState("");
-  const [loaded, setLoaded] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [familyName, setFamilyName] = useState("");
+
   const [organization, setOrganization] =
     useState<Organization>("Cuórum de Élderes");
 
-  useEffect(() => {
-    try {
-      const savedMembers = localStorage.getItem(STORAGE_MEMBERS);
-      const savedAttendance = localStorage.getItem(STORAGE_ATTENDANCE);
+  const [recentConvert, setRecentConvert] =
+    useState(false);
 
-      if (savedMembers) {
-        setMembers(JSON.parse(savedMembers));
-      }
+  const [loadingMembers, setLoadingMembers] =
+    useState(true);
 
-      if (savedAttendance) {
-        setAttendance(JSON.parse(savedAttendance));
-      }
-    } catch (error) {
-      console.error("No se pudieron cargar los datos:", error);
-    } finally {
-      setLoaded(true);
+  const [loadingAttendance, setLoadingAttendance] =
+    useState(true);
+
+  const [savingMember, setSavingMember] =
+    useState(false);
+
+  const [changingAttendance, setChangingAttendance] =
+    useState<string | null>(null);
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  const loadMembers = useCallback(async () => {
+    setLoadingMembers(true);
+    setErrorMessage("");
+
+    const { data, error } = await supabase
+      .from("members")
+      .select(
+        `
+          id,
+          full_name,
+          family_name,
+          organization,
+          recent_convert,
+          active,
+          created_at
+        `,
+      )
+      .eq("active", true)
+      .order("full_name", { ascending: true });
+
+    if (error) {
+      console.error("Error cargando miembros:", error);
+
+      setErrorMessage(
+        `No fue posible cargar los miembros: ${error.message}`,
+      );
+
+      setLoadingMembers(false);
+      return;
     }
+
+    setMembers((data ?? []) as Member[]);
+    setLoadingMembers(false);
   }, []);
 
+  const loadMeetingAndAttendance =
+    useCallback(async (date: string) => {
+      if (!date) return;
+
+      setLoadingAttendance(true);
+      setErrorMessage("");
+
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError || !userData.user) {
+        console.error(
+          "No se encontró el usuario:",
+          userError,
+        );
+
+        setErrorMessage(
+          "No existe una sesión válida. Cierra sesión y vuelve a ingresar.",
+        );
+
+        setLoadingAttendance(false);
+        return;
+      }
+
+      const { data: meetingData, error: meetingError } =
+        await supabase
+          .from("meetings")
+          .upsert(
+            {
+              meeting_date: date,
+              meeting_type: "sacrament",
+            },
+            {
+              onConflict: "meeting_date",
+            },
+          )
+          .select("id, meeting_date")
+          .single();
+
+      if (meetingError || !meetingData) {
+        console.error(
+          "Error creando o cargando reunión:",
+          meetingError,
+        );
+
+        setErrorMessage(
+          `No fue posible cargar la reunión: ${
+            meetingError?.message ??
+            "Respuesta vacía de Supabase"
+          }`,
+        );
+
+        setLoadingAttendance(false);
+        return;
+      }
+
+      const meeting = meetingData as Meeting;
+
+      setMeetingId(meeting.id);
+
+      const { data: attendanceData, error: attendanceError } =
+        await supabase
+          .from("attendance")
+          .select("member_id")
+          .eq("meeting_id", meeting.id)
+          .eq("present", true);
+
+      if (attendanceError) {
+        console.error(
+          "Error cargando asistencia:",
+          attendanceError,
+        );
+
+        setErrorMessage(
+          `No fue posible cargar la asistencia: ${attendanceError.message}`,
+        );
+
+        setLoadingAttendance(false);
+        return;
+      }
+
+      const memberIds = new Set(
+        ((attendanceData ?? []) as AttendanceRow[]).map(
+          (row) => row.member_id,
+        ),
+      );
+
+      setPresentMemberIds(memberIds);
+      setLoadingAttendance(false);
+    }, []);
+
   useEffect(() => {
-    if (!loaded) return;
-
-    localStorage.setItem(STORAGE_MEMBERS, JSON.stringify(members));
-  }, [members, loaded]);
+    loadMembers();
+  }, [loadMembers]);
 
   useEffect(() => {
-    if (!loaded) return;
-
-    localStorage.setItem(STORAGE_ATTENDANCE, JSON.stringify(attendance));
-  }, [attendance, loaded]);
-
-  const presentMemberIds = attendance[meetingDate] ?? [];
+    loadMeetingAndAttendance(meetingDate);
+  }, [meetingDate, loadMeetingAndAttendance]);
 
   const filteredAttendanceMembers = useMemo(() => {
-    const search = attendanceSearch.trim().toLowerCase();
+    const search =
+      attendanceSearch.trim().toLowerCase();
 
-    return [...members]
-      .filter((member) => {
-        const searchableText =
-          `${member.fullName} ${member.familyName} ${member.organization}`.toLowerCase();
+    return members.filter((member) => {
+      const searchableText = [
+        member.full_name,
+        member.family_name ?? "",
+        member.organization,
+      ]
+        .join(" ")
+        .toLowerCase();
 
-        return searchableText.includes(search);
-      })
-      .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+      return searchableText.includes(search);
+    });
   }, [members, attendanceSearch]);
 
   const filteredDirectoryMembers = useMemo(() => {
     const search = memberSearch.trim().toLowerCase();
 
-    return [...members]
-      .filter((member) => {
-        const searchableText =
-          `${member.fullName} ${member.familyName} ${member.organization}`.toLowerCase();
+    return members.filter((member) => {
+      const searchableText = [
+        member.full_name,
+        member.family_name ?? "",
+        member.organization,
+      ]
+        .join(" ")
+        .toLowerCase();
 
-        return searchableText.includes(search);
-      })
-      .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+      return searchableText.includes(search);
+    });
   }, [members, memberSearch]);
 
-  const presentMembers = members.filter((member) =>
-    presentMemberIds.includes(member.id),
+  const presentMembers = useMemo(
+    () =>
+      members.filter((member) =>
+        presentMemberIds.has(member.id),
+      ),
+    [members, presentMemberIds],
   );
 
-  const absentMembers = members.filter(
-    (member) => !presentMemberIds.includes(member.id),
+  const absentMembers = useMemo(
+    () =>
+      members.filter(
+        (member) =>
+          !presentMemberIds.has(member.id),
+      ),
+    [members, presentMemberIds],
   );
 
   const attendancePercentage =
     members.length === 0
       ? 0
-      : Math.round((presentMembers.length / members.length) * 100);
+      : Math.round(
+          (presentMembers.length / members.length) *
+            100,
+        );
 
   const families = useMemo(() => {
     const familyMap = new Map<string, Member[]>();
 
     members.forEach((member) => {
-      const family = member.familyName.trim() || "Sin familia";
+      const family =
+        member.family_name?.trim() || "Sin familia";
 
-      const currentMembers = familyMap.get(family) ?? [];
-      currentMembers.push(member);
+      const familyMembers =
+        familyMap.get(family) ?? [];
 
-      familyMap.set(family, currentMembers);
+      familyMembers.push(member);
+      familyMap.set(family, familyMembers);
     });
 
-    return Array.from(familyMap.entries()).sort(([familyA], [familyB]) =>
-      familyA.localeCompare(familyB, "es"),
+    return Array.from(familyMap.entries()).sort(
+      ([familyA], [familyB]) =>
+        familyA.localeCompare(familyB, "es"),
     );
   }, [members]);
 
-  function toggleAttendance(memberId: string) {
-    setAttendance((currentAttendance) => {
-      const currentDateAttendance = currentAttendance[meetingDate] ?? [];
-      const isPresent = currentDateAttendance.includes(memberId);
-
-      const newDateAttendance = isPresent
-        ? currentDateAttendance.filter((id) => id !== memberId)
-        : [...currentDateAttendance, memberId];
-
-      return {
-        ...currentAttendance,
-        [meetingDate]: newDateAttendance,
-      };
-    });
-  }
-
-  function markWholeFamily(familyMembers: Member[]) {
-    const familyMemberIds = familyMembers.map((member) => member.id);
-
-    setAttendance((currentAttendance) => {
-      const currentDateAttendance = currentAttendance[meetingDate] ?? [];
-
-      const allFamilyPresent = familyMemberIds.every((memberId) =>
-        currentDateAttendance.includes(memberId),
-      );
-
-      let newDateAttendance: string[];
-
-      if (allFamilyPresent) {
-        newDateAttendance = currentDateAttendance.filter(
-          (memberId) => !familyMemberIds.includes(memberId),
-        );
-      } else {
-        newDateAttendance = Array.from(
-          new Set([...currentDateAttendance, ...familyMemberIds]),
-        );
-      }
-
-      return {
-        ...currentAttendance,
-        [meetingDate]: newDateAttendance,
-      };
-    });
-  }
-
-  function addMember(event: FormEvent<HTMLFormElement>) {
+  async function addMember(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     const cleanName = fullName.trim();
     const cleanFamily = familyName.trim();
 
     if (!cleanName) {
-      alert("Escribe el nombre del miembro.");
+      setErrorMessage(
+        "Escribe el nombre completo del miembro.",
+      );
+
       return;
     }
 
-    const newMember: Member = {
-      id: createId(),
-      fullName: cleanName,
-      familyName: cleanFamily,
-      organization,
-    };
+    setSavingMember(true);
+    setErrorMessage("");
 
-    setMembers((currentMembers) => [...currentMembers, newMember]);
+    const { data, error } = await supabase
+      .from("members")
+      .insert({
+        full_name: cleanName,
+        family_name: cleanFamily || null,
+        organization,
+        recent_convert: recentConvert,
+        active: true,
+      })
+      .select(
+        `
+          id,
+          full_name,
+          family_name,
+          organization,
+          recent_convert,
+          active,
+          created_at
+        `,
+      )
+      .single();
+
+    if (error || !data) {
+      console.error("Error agregando miembro:", error);
+
+      setErrorMessage(
+        `No fue posible agregar el miembro: ${
+          error?.message ??
+          "Supabase no devolvió el registro"
+        }`,
+      );
+
+      setSavingMember(false);
+      return;
+    }
+
+    setMembers((currentMembers) =>
+      [...currentMembers, data as Member].sort(
+        (memberA, memberB) =>
+          memberA.full_name.localeCompare(
+            memberB.full_name,
+            "es",
+          ),
+      ),
+    );
 
     setFullName("");
     setFamilyName("");
     setOrganization("Cuórum de Élderes");
+    setRecentConvert(false);
+    setSavingMember(false);
   }
 
-  function deleteMember(member: Member) {
+  async function deleteMember(member: Member) {
     const confirmed = window.confirm(
-      `¿Estás seguro de que deseas eliminar a ${member.fullName}?`,
+      `¿Estás seguro de que deseas eliminar a ${member.full_name}?`,
     );
 
     if (!confirmed) return;
 
-    setMembers((currentMembers) =>
-      currentMembers.filter((currentMember) => currentMember.id !== member.id),
-    );
+    setErrorMessage("");
 
-    setAttendance((currentAttendance) => {
-      const updatedAttendance: AttendanceRecord = {};
+    const { error } = await supabase
+      .from("members")
+      .delete()
+      .eq("id", member.id);
 
-      Object.entries(currentAttendance).forEach(([date, memberIds]) => {
-        updatedAttendance[date] = memberIds.filter(
-          (memberId) => memberId !== member.id,
-        );
-      });
+    if (error) {
+      console.error("Error eliminando miembro:", error);
 
-      return updatedAttendance;
-    });
-  }
-
-  function loadDemoData() {
-    if (members.length > 0) {
-      const confirmed = window.confirm(
-        "Ya existen miembros. ¿Deseas reemplazarlos con los datos de demostración?",
+      setErrorMessage(
+        `No fue posible eliminar el miembro: ${error.message}`,
       );
 
-      if (!confirmed) return;
+      return;
     }
 
-    setMembers(demoMembers);
-    setAttendance({
-      [meetingDate]: ["1", "2", "3", "4"],
+    setMembers((currentMembers) =>
+      currentMembers.filter(
+        (currentMember) =>
+          currentMember.id !== member.id,
+      ),
+    );
+
+    setPresentMemberIds((currentIds) => {
+      const updatedIds = new Set(currentIds);
+      updatedIds.delete(member.id);
+      return updatedIds;
     });
   }
 
-  function clearMeetingAttendance() {
+  async function toggleAttendance(member: Member) {
+    if (!meetingId) {
+      setErrorMessage(
+        "La reunión todavía no está lista.",
+      );
+
+      return;
+    }
+
+    setChangingAttendance(member.id);
+    setErrorMessage("");
+
+    const currentlyPresent =
+      presentMemberIds.has(member.id);
+
+    if (currentlyPresent) {
+      const { error } = await supabase
+        .from("attendance")
+        .delete()
+        .eq("meeting_id", meetingId)
+        .eq("member_id", member.id);
+
+      if (error) {
+        console.error(
+          "Error eliminando asistencia:",
+          error,
+        );
+
+        setErrorMessage(
+          `No fue posible quitar la asistencia: ${error.message}`,
+        );
+
+        setChangingAttendance(null);
+        return;
+      }
+
+      setPresentMemberIds((currentIds) => {
+        const updatedIds = new Set(currentIds);
+        updatedIds.delete(member.id);
+        return updatedIds;
+      });
+
+      setChangingAttendance(null);
+      return;
+    }
+
+    const { data: userData, error: userError } =
+      await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      setErrorMessage(
+        "No existe una sesión válida. Vuelve a iniciar sesión.",
+      );
+
+      setChangingAttendance(null);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("attendance")
+      .insert({
+        meeting_id: meetingId,
+        member_id: member.id,
+        present: true,
+        recorded_by: userData.user.id,
+      });
+
+    if (error) {
+      console.error(
+        "Error registrando asistencia:",
+        error,
+      );
+
+      setErrorMessage(
+        `No fue posible registrar la asistencia: ${error.message}`,
+      );
+
+      setChangingAttendance(null);
+      return;
+    }
+
+    setPresentMemberIds((currentIds) => {
+      const updatedIds = new Set(currentIds);
+      updatedIds.add(member.id);
+      return updatedIds;
+    });
+
+    setChangingAttendance(null);
+  }
+
+  async function markWholeFamily(
+    familyMembers: Member[],
+  ) {
+    if (!meetingId) {
+      setErrorMessage(
+        "La reunión todavía no está lista.",
+      );
+
+      return;
+    }
+
+    setErrorMessage("");
+
+    const familyMemberIds = familyMembers.map(
+      (member) => member.id,
+    );
+
+    const allPresent = familyMemberIds.every(
+      (memberId) =>
+        presentMemberIds.has(memberId),
+    );
+
+    if (allPresent) {
+      const { error } = await supabase
+        .from("attendance")
+        .delete()
+        .eq("meeting_id", meetingId)
+        .in("member_id", familyMemberIds);
+
+      if (error) {
+        console.error(
+          "Error desmarcando familia:",
+          error,
+        );
+
+        setErrorMessage(
+          `No fue posible desmarcar la familia: ${error.message}`,
+        );
+
+        return;
+      }
+
+      setPresentMemberIds((currentIds) => {
+        const updatedIds = new Set(currentIds);
+
+        familyMemberIds.forEach((memberId) =>
+          updatedIds.delete(memberId),
+        );
+
+        return updatedIds;
+      });
+
+      return;
+    }
+
+    const { data: userData, error: userError } =
+      await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      setErrorMessage(
+        "No existe una sesión válida. Vuelve a iniciar sesión.",
+      );
+
+      return;
+    }
+
+    const missingMemberIds = familyMemberIds.filter(
+      (memberId) =>
+        !presentMemberIds.has(memberId),
+    );
+
+    const newRecords = missingMemberIds.map(
+      (memberId) => ({
+        meeting_id: meetingId,
+        member_id: memberId,
+        present: true,
+        recorded_by: userData.user!.id,
+      }),
+    );
+
+    if (newRecords.length === 0) return;
+
+    const { error } = await supabase
+      .from("attendance")
+      .insert(newRecords);
+
+    if (error) {
+      console.error(
+        "Error marcando familia:",
+        error,
+      );
+
+      setErrorMessage(
+        `No fue posible marcar la familia: ${error.message}`,
+      );
+
+      return;
+    }
+
+    setPresentMemberIds((currentIds) => {
+      const updatedIds = new Set(currentIds);
+
+      missingMemberIds.forEach((memberId) =>
+        updatedIds.add(memberId),
+      );
+
+      return updatedIds;
+    });
+  }
+
+  async function clearMeetingAttendance() {
+    if (!meetingId) return;
+
     const confirmed = window.confirm(
-      "¿Deseas borrar toda la asistencia de la fecha seleccionada?",
+      `¿Deseas borrar toda la asistencia del ${formatDate(
+        meetingDate,
+      )}?`,
     );
 
     if (!confirmed) return;
 
-    setAttendance((currentAttendance) => ({
-      ...currentAttendance,
-      [meetingDate]: [],
-    }));
+    setErrorMessage("");
+
+    const { error } = await supabase
+      .from("attendance")
+      .delete()
+      .eq("meeting_id", meetingId);
+
+    if (error) {
+      console.error(
+        "Error limpiando asistencia:",
+        error,
+      );
+
+      setErrorMessage(
+        `No fue posible limpiar la asistencia: ${error.message}`,
+      );
+
+      return;
+    }
+
+    setPresentMemberIds(new Set());
   }
 
-  if (!loaded) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100">
-        <p className="font-semibold text-slate-600">Cargando aplicación...</p>
-      </main>
-    );
-  }
+  const loading =
+    loadingMembers || loadingAttendance;
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -328,7 +675,7 @@ export default function Home() {
           </h1>
 
           <p className="mt-2 text-sm text-emerald-100">
-            Registro local de miembros presentes y ausentes
+            Información sincronizada con Supabase
           </p>
         </div>
       </header>
@@ -338,24 +685,45 @@ export default function Home() {
           <NavigationButton
             active={activeTab === "attendance"}
             label="Asistencia"
-            onClick={() => setActiveTab("attendance")}
+            onClick={() =>
+              setActiveTab("attendance")
+            }
           />
 
           <NavigationButton
             active={activeTab === "summary"}
             label="Resumen"
-            onClick={() => setActiveTab("summary")}
+            onClick={() =>
+              setActiveTab("summary")
+            }
           />
 
           <NavigationButton
             active={activeTab === "members"}
             label="Miembros"
-            onClick={() => setActiveTab("members")}
+            onClick={() =>
+              setActiveTab("members")
+            }
           />
         </div>
       </nav>
 
       <div className="mx-auto max-w-5xl p-4 sm:p-6">
+        {errorMessage && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800"
+          >
+            {errorMessage}
+          </div>
+        )}
+
+        {loading && (
+          <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-800">
+            Cargando información desde Supabase...
+          </div>
+        )}
+
         {activeTab === "attendance" && (
           <section>
             <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -370,9 +738,16 @@ export default function Home() {
                 id="meetingDate"
                 type="date"
                 value={meetingDate}
-                onChange={(event) => setMeetingDate(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 sm:max-w-xs"
+                disabled={loadingAttendance}
+                onChange={(event) =>
+                  setMeetingDate(event.target.value)
+                }
+                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100 sm:max-w-xs"
               />
+
+              <p className="mt-2 text-sm capitalize text-slate-500">
+                {formatDate(meetingDate)}
+              </p>
             </div>
 
             <div className="mt-4 grid grid-cols-3 gap-3">
@@ -398,7 +773,9 @@ export default function Home() {
                   type="search"
                   value={attendanceSearch}
                   onChange={(event) =>
-                    setAttendanceSearch(event.target.value)
+                    setAttendanceSearch(
+                      event.target.value,
+                    )
                   }
                   placeholder="Buscar miembro, familia u organización..."
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700"
@@ -407,7 +784,11 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={clearMeetingAttendance}
-                  className="rounded-xl border border-red-300 px-4 py-3 font-bold text-red-700 hover:bg-red-50"
+                  disabled={
+                    loadingAttendance ||
+                    presentMemberIds.size === 0
+                  }
+                  className="rounded-xl border border-red-300 px-4 py-3 font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Limpiar día
                 </button>
@@ -415,95 +796,138 @@ export default function Home() {
             </div>
 
             <div className="mt-4 space-y-3">
-              {filteredAttendanceMembers.map((member) => {
-                const isPresent = presentMemberIds.includes(member.id);
+              {filteredAttendanceMembers.map(
+                (member) => {
+                  const isPresent =
+                    presentMemberIds.has(member.id);
 
-                return (
-                  <article
-                    key={member.id}
-                    className={`flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-sm ${
-                      isPresent
-                        ? "border-emerald-300 bg-emerald-50"
-                        : "border-slate-200 bg-white"
-                    }`}
-                  >
-                    <div>
-                      <h2 className="font-bold">{member.fullName}</h2>
+                  const isChanging =
+                    changingAttendance === member.id;
 
-                      <p className="mt-1 text-sm text-slate-500">
-                        {member.familyName || "Sin familia"} ·{" "}
-                        {member.organization}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleAttendance(member.id)}
-                      className={`min-w-28 rounded-xl px-4 py-3 font-bold ${
+                  return (
+                    <article
+                      key={member.id}
+                      className={`flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-sm ${
                         isPresent
-                          ? "bg-emerald-700 text-white"
-                          : "bg-slate-200 text-slate-700"
+                          ? "border-emerald-300 bg-emerald-50"
+                          : "border-slate-200 bg-white"
                       }`}
                     >
-                      {isPresent ? "✓ Presente" : "Marcar"}
-                    </button>
-                  </article>
-                );
-              })}
+                      <div>
+                        <h2 className="font-bold">
+                          {member.full_name}
+                        </h2>
 
-              {members.length === 0 && (
-                <EmptyMessage message="Todavía no hay miembros registrados." />
+                        <p className="mt-1 text-sm text-slate-500">
+                          {member.family_name ||
+                            "Sin familia"}{" "}
+                          · {member.organization}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={
+                          isChanging ||
+                          loadingAttendance
+                        }
+                        onClick={() =>
+                          toggleAttendance(member)
+                        }
+                        className={`min-w-28 rounded-xl px-4 py-3 font-bold disabled:cursor-not-allowed disabled:opacity-60 ${
+                          isPresent
+                            ? "bg-emerald-700 text-white"
+                            : "bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {isChanging
+                          ? "Guardando..."
+                          : isPresent
+                            ? "✓ Presente"
+                            : "Marcar"}
+                      </button>
+                    </article>
+                  );
+                },
               )}
 
+              {!loadingMembers &&
+                members.length === 0 && (
+                  <EmptyMessage message="Todavía no hay miembros registrados en Supabase." />
+                )}
+
               {members.length > 0 &&
-                filteredAttendanceMembers.length === 0 && (
+                filteredAttendanceMembers.length ===
+                  0 && (
                   <EmptyMessage message="No se encontraron miembros." />
                 )}
             </div>
 
             {families.length > 0 && (
               <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
-                <h2 className="text-xl font-bold">Registrar por familia</h2>
+                <h2 className="text-xl font-bold">
+                  Registrar por familia
+                </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Presiona el botón para marcar o desmarcar a todos los
-                  integrantes.
+                  El registro se guardará inmediatamente
+                  en Supabase.
                 </p>
 
                 <div className="mt-4 space-y-3">
-                  {families.map(([family, familyMembers]) => {
-                    const allPresent = familyMembers.every((member) =>
-                      presentMemberIds.includes(member.id),
-                    );
+                  {families.map(
+                    ([family, familyMembers]) => {
+                      const allPresent =
+                        familyMembers.every(
+                          (member) =>
+                            presentMemberIds.has(
+                              member.id,
+                            ),
+                        );
 
-                    return (
-                      <div
-                        key={family}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
-                      >
-                        <div>
-                          <h3 className="font-bold">{family}</h3>
-
-                          <p className="text-sm text-slate-500">
-                            {familyMembers.length} miembro
-                            {familyMembers.length === 1 ? "" : "s"}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => markWholeFamily(familyMembers)}
-                          className={`rounded-xl px-4 py-3 font-bold ${
-                            allPresent
-                              ? "bg-red-100 text-red-700"
-                              : "bg-emerald-100 text-emerald-800"
-                          }`}
+                      return (
+                        <div
+                          key={family}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
                         >
-                          {allPresent ? "Desmarcar" : "Marcar familia"}
-                        </button>
-                      </div>
-                    );
-                  })}
+                          <div>
+                            <h3 className="font-bold">
+                              {family}
+                            </h3>
+
+                            <p className="text-sm text-slate-500">
+                              {familyMembers.length}{" "}
+                              miembro
+                              {familyMembers.length === 1
+                                ? ""
+                                : "s"}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={
+                              loadingAttendance
+                            }
+                            onClick={() =>
+                              markWholeFamily(
+                                familyMembers,
+                              )
+                            }
+                            className={`rounded-xl px-4 py-3 font-bold disabled:opacity-50 ${
+                              allPresent
+                                ? "bg-red-100 text-red-700"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}
+                          >
+                            {allPresent
+                              ? "Desmarcar"
+                              : "Marcar familia"}
+                          </button>
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               </div>
             )}
@@ -512,7 +936,17 @@ export default function Home() {
 
         {activeTab === "summary" && (
           <section>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">
+                Resumen
+              </p>
+
+              <h2 className="mt-2 text-xl font-bold capitalize">
+                {formatDate(meetingDate)}
+              </h2>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-3">
               <MetricCard
                 number={presentMembers.length}
                 label="Presentes"
@@ -536,18 +970,14 @@ export default function Home() {
 
               <div className="mt-4 space-y-2">
                 {presentMembers.length > 0 ? (
-                  presentMembers
-                    .sort((a, b) =>
-                      a.fullName.localeCompare(b.fullName, "es"),
-                    )
-                    .map((member) => (
-                      <SummaryMember
-                        key={member.id}
-                        member={member}
-                        status="Presente"
-                        present
-                      />
-                    ))
+                  presentMembers.map((member) => (
+                    <SummaryMember
+                      key={member.id}
+                      member={member}
+                      status="Presente"
+                      present
+                    />
+                  ))
                 ) : (
                   <EmptyMessage message="No hay miembros marcados como presentes." />
                 )}
@@ -561,17 +991,13 @@ export default function Home() {
 
               <div className="mt-4 space-y-2">
                 {absentMembers.length > 0 ? (
-                  absentMembers
-                    .sort((a, b) =>
-                      a.fullName.localeCompare(b.fullName, "es"),
-                    )
-                    .map((member) => (
-                      <SummaryMember
-                        key={member.id}
-                        member={member}
-                        status="Ausente"
-                      />
-                    ))
+                  absentMembers.map((member) => (
+                    <SummaryMember
+                      key={member.id}
+                      member={member}
+                      status="Ausente"
+                    />
+                  ))
                 ) : (
                   <EmptyMessage message="No hay miembros ausentes." />
                 )}
@@ -587,6 +1013,10 @@ export default function Home() {
                 Agregar miembro
               </h2>
 
+              <p className="mt-1 text-sm text-slate-500">
+                El miembro se guardará en Supabase.
+              </p>
+
               <form
                 onSubmit={addMember}
                 className="mt-4 grid gap-4 sm:grid-cols-2"
@@ -599,9 +1029,12 @@ export default function Home() {
                   <input
                     type="text"
                     value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
+                    disabled={savingMember}
+                    onChange={(event) =>
+                      setFullName(event.target.value)
+                    }
                     placeholder="Ej. María López"
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700"
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
                   />
                 </label>
 
@@ -613,9 +1046,14 @@ export default function Home() {
                   <input
                     type="text"
                     value={familyName}
-                    onChange={(event) => setFamilyName(event.target.value)}
+                    disabled={savingMember}
+                    onChange={(event) =>
+                      setFamilyName(
+                        event.target.value,
+                      )
+                    }
                     placeholder="Ej. Familia López"
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700"
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
                   />
                 </label>
 
@@ -626,91 +1064,133 @@ export default function Home() {
 
                   <select
                     value={organization}
+                    disabled={savingMember}
                     onChange={(event) =>
-                      setOrganization(event.target.value as Organization)
+                      setOrganization(
+                        event.target
+                          .value as Organization,
+                      )
                     }
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-emerald-700"
+                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
                   >
-                    <option>Cuórum de Élderes</option>
-                    <option>Sociedad de Socorro</option>
-                    <option>Hombres Jóvenes</option>
-                    <option>Mujeres Jóvenes</option>
+                    <option>
+                      Cuórum de Élderes
+                    </option>
+                    <option>
+                      Sociedad de Socorro
+                    </option>
+                    <option>
+                      Hombres Jóvenes
+                    </option>
+                    <option>
+                      Mujeres Jóvenes
+                    </option>
                     <option>Primaria</option>
                     <option>Otro</option>
                   </select>
                 </label>
 
+                <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={recentConvert}
+                    disabled={savingMember}
+                    onChange={(event) =>
+                      setRecentConvert(
+                        event.target.checked,
+                      )
+                    }
+                    className="h-5 w-5"
+                  />
+
+                  <span className="font-semibold text-slate-700">
+                    Converso reciente
+                  </span>
+                </label>
+
                 <button
                   type="submit"
-                  className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white hover:bg-emerald-800 sm:col-span-2"
+                  disabled={savingMember}
+                  className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-400 sm:col-span-2"
                 >
-                  Agregar miembro
+                  {savingMember
+                    ? "Guardando..."
+                    : "Agregar miembro"}
                 </button>
               </form>
             </div>
 
             <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-xl font-bold">
-                    Directorio local
-                  </h2>
+              <div>
+                <h2 className="text-xl font-bold">
+                  Directorio
+                </h2>
 
-                  <p className="text-sm text-slate-500">
-                    {members.length} miembro
-                    {members.length === 1 ? "" : "s"} registrado
-                    {members.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={loadDemoData}
-                  className="rounded-xl bg-slate-200 px-4 py-3 font-bold text-slate-700"
-                >
-                  Cargar demostración
-                </button>
+                <p className="text-sm text-slate-500">
+                  {members.length} miembro
+                  {members.length === 1 ? "" : "s"}{" "}
+                  almacenado
+                  {members.length === 1 ? "" : "s"}{" "}
+                  en Supabase
+                </p>
               </div>
 
               <input
                 type="search"
                 value={memberSearch}
-                onChange={(event) => setMemberSearch(event.target.value)}
+                onChange={(event) =>
+                  setMemberSearch(event.target.value)
+                }
                 placeholder="Buscar miembro..."
                 className="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700"
               />
 
               <div className="mt-4 space-y-3">
-                {filteredDirectoryMembers.map((member) => (
-                  <article
-                    key={member.id}
-                    className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4"
-                  >
-                    <div>
-                      <h3 className="font-bold">{member.fullName}</h3>
-
-                      <p className="mt-1 text-sm text-slate-500">
-                        {member.familyName || "Sin familia"} ·{" "}
-                        {member.organization}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => deleteMember(member)}
-                      className="rounded-xl bg-red-100 px-4 py-2 font-bold text-red-700 hover:bg-red-200"
+                {filteredDirectoryMembers.map(
+                  (member) => (
+                    <article
+                      key={member.id}
+                      className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4"
                     >
-                      Eliminar
-                    </button>
-                  </article>
-                ))}
+                      <div>
+                        <h3 className="font-bold">
+                          {member.full_name}
+                        </h3>
 
-                {members.length === 0 && (
-                  <EmptyMessage message="Todavía no hay miembros registrados." />
+                        <p className="mt-1 text-sm text-slate-500">
+                          {member.family_name ||
+                            "Sin familia"}{" "}
+                          · {member.organization}
+                        </p>
+
+                        {member.recent_convert && (
+                          <span className="mt-2 inline-block rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800">
+                            Converso reciente
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          deleteMember(member)
+                        }
+                        className="rounded-xl bg-red-100 px-4 py-2 font-bold text-red-700 hover:bg-red-200"
+                      >
+                        Eliminar
+                      </button>
+                    </article>
+                  ),
                 )}
 
+                {!loadingMembers &&
+                  members.length === 0 && (
+                    <EmptyMessage message="Todavía no hay miembros almacenados en Supabase." />
+                  )}
+
                 {members.length > 0 &&
-                  filteredDirectoryMembers.length === 0 && (
+                  filteredDirectoryMembers.length ===
+                    0 && (
                     <EmptyMessage message="No se encontraron miembros." />
                   )}
               </div>
@@ -753,7 +1233,10 @@ type MetricCardProps = {
   label: string;
 };
 
-function MetricCard({ number, label }: MetricCardProps) {
+function MetricCard({
+  number,
+  label,
+}: MetricCardProps) {
   return (
     <article className="rounded-2xl bg-white p-4 text-center shadow-sm">
       <strong className="block text-2xl font-bold text-emerald-800">
@@ -781,10 +1264,13 @@ function SummaryMember({
   return (
     <article className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
       <div>
-        <h3 className="font-bold">{member.fullName}</h3>
+        <h3 className="font-bold">
+          {member.full_name}
+        </h3>
 
         <p className="text-sm text-slate-500">
-          {member.familyName || "Sin familia"} · {member.organization}
+          {member.family_name || "Sin familia"} ·{" "}
+          {member.organization}
         </p>
       </div>
 
@@ -801,7 +1287,11 @@ function SummaryMember({
   );
 }
 
-function EmptyMessage({ message }: { message: string }) {
+function EmptyMessage({
+  message,
+}: {
+  message: string;
+}) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
       {message}
