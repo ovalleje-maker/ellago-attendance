@@ -17,8 +17,8 @@ export default function SupabaseTestPage() {
   useEffect(() => {
     async function testConnection() {
       const { data, error } = await supabase
-        .from("members")
-        .select("id, full_name")
+        .from("connection_test")
+        .select("id, message, created_at")
         .limit(1)
         .maybeSingle<ConnectionTest>();
 
