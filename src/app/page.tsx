@@ -9,35 +9,9 @@ import {
 } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import type { Member, Organization } from "@/types/member";
 
-type Organization =
-  | "Cuórum de Élderes"
-  | "Sociedad de Socorro"
-  | "Hombres Jóvenes"
-  | "Mujeres Jóvenes"
-  | "Primaria"
-  | "Otro";
-
-type Member = {
-  id: string;
-  full_name: string;
-  family_name: string | null;
-  organization: Organization;
-  recent_convert: boolean;
-  active: boolean;
-  created_at: string;
-};
-
-type Meeting = {
-  id: string;
-  meeting_date: string;
-};
-
-type AttendanceRow = {
-  member_id: string;
-};
-
-type Tab = "attendance" | "summary" | "members";
+import type { AttendanceRow, Meeting, AppTab } from "@/types/navigation";
 
 function getMostRecentSunday(): string {
   const date = new Date();
@@ -77,7 +51,7 @@ const canRecordAttendance =
   profile?.role === "secretary" ||
   profile?.role === "leader";
   const [activeTab, setActiveTab] =
-    useState<Tab>("attendance");
+    useState<AppTab>("attendance");
 
   const [members, setMembers] = useState<Member[]>([]);
   const [presentMemberIds, setPresentMemberIds] =
