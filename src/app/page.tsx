@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import type { Member, Organization } from "@/types/member";
 
-import type { AttendanceRow, Meeting, AppTab } from "@/types/navigation";
+import type { AppTab } from "@/types/navigation";
 import {
   formatMeetingDate,
   getMostRecentSunday,
@@ -20,6 +20,25 @@ import EmptyMessage from "@/components/ui/EmptyMessage";
 import ErrorAlert from "@/components/ui/ErrorAlert";
 import MetricCard from "@/components/ui/MetricCard";
 import NavigationButton from "@/components/ui/NavigationButton";
+import SummaryMember from "@/components/attendance/SummaryMember";
+import {
+  createMember,
+  getActiveMembers,
+  removeMember,
+} from "@/services/membersService";
+
+import {
+  getOrCreateMeeting,
+} from "@/services/meetingsService";
+
+import {
+  addAttendance,
+  addFamilyAttendance,
+  clearAttendance,
+  getPresentMemberIds,
+  removeAttendance,
+  removeFamilyAttendance,
+} from "@/services/attendanceService";
 
 
 export default function Home() {
@@ -82,39 +101,29 @@ const canRecordAttendance =
     useState("");
 
   const loadMembers = useCallback(async () => {
-    setLoadingMembers(true);
-    setErrorMessage("");
+  setLoadingMembers(true);
+  setErrorMessage("");
 
-    const { data, error } = await supabase
-      .from("members")
-      .select(
-        `
-          id,
-          full_name,
-          family_name,
-          organization,
-          recent_convert,
-          active,
-          created_at
-        `,
-      )
-      .eq("active", true)
-      .order("full_name", { ascending: true });
+  try {
+    const loadedMembers =
+      await getActiveMembers();
 
-    if (error) {
-      console.error("Error cargando miembros:", error);
+    setMembers(loadedMembers);
+  } catch (error) {
+    console.error(
+      "Error cargando miembros:",
+      error,
+    );
 
-      setErrorMessage(
-        `No fue posible cargar los miembros: ${error.message}`,
-      );
-
-      setLoadingMembers(false);
-      return;
-    }
-
-    setMembers((data ?? []) as Member[]);
+    setErrorMessage(
+      error instanceof Error
+        ? `No fue posible cargar los miembros: ${error.message}`
+        : "No fue posible cargar los miembros.",
+    );
+  } finally {
     setLoadingMembers(false);
-  }, []);
+  }
+}, []);
 
   const loadMeetingAndAttendance =
     useCallback(async (date: string) => {
@@ -123,114 +132,24 @@ const canRecordAttendance =
       setLoadingAttendance(true);
       setErrorMessage("");
 
-      const { data: userData, error: userError } =
-        await supabase.auth.getUser();
+      try {
+        const meeting = await getOrCreateMeeting(date);
 
-      if (userError || !userData.user) {
-        console.error(
-          "No se encontró el usuario:",
-          userError,
-        );
+        setMeetingId(meeting.id);
 
-        setErrorMessage(
-          "No existe una sesión válida. Cierra sesión y vuelve a ingresar.",
-        );
-
-        setLoadingAttendance(false);
-        return;
-      }
-
-      let meetingData: Meeting | null = null;
-
-const {
-  data: existingMeeting,
-  error: searchMeetingError,
-} = await supabase
-  .from("meetings")
-  .select("id, meeting_date")
-  .eq("meeting_date", date)
-  .maybeSingle();
-
-if (searchMeetingError) {
-  console.error(
-    "Error buscando reunión:",
-    searchMeetingError,
-  );
-
-  setErrorMessage(
-    `No fue posible buscar la reunión: ${searchMeetingError.message}`,
-  );
-
-  setLoadingAttendance(false);
-  return;
-}
-
-if (existingMeeting) {
-  meetingData = existingMeeting as Meeting;
-} else {
-  const {
-    data: createdMeeting,
-    error: createMeetingError,
-  } = await supabase
-    .from("meetings")
-    .insert({
-      meeting_date: date,
-      meeting_type: "sacrament",
-    })
-    .select("id, meeting_date")
-    .single();
-
-  if (createMeetingError || !createdMeeting) {
-    console.error(
-      "Error creando reunión:",
-      createMeetingError,
-    );
-
-    setErrorMessage(
-      `No fue posible crear la reunión: ${
-        createMeetingError?.message ??
-        "Supabase no devolvió la reunión"
-      }`,
-    );
-
-    setLoadingAttendance(false);
-    return;
-  }
-
-  meetingData = createdMeeting as Meeting;
-}
-
-setMeetingId(meetingData.id);
-
-      const { data: attendanceData, error: attendanceError } =
-        await supabase
-          .from("attendance")
-          .select("member_id")
-          .eq("meeting_id", meetingData.id)
-          .eq("present", true);
-
-      if (attendanceError) {
-        console.error(
-          "Error cargando asistencia:",
-          attendanceError,
-        );
+        const memberIds = await getPresentMemberIds(meeting.id);
+        setPresentMemberIds(memberIds);
+      } catch (error) {
+        console.error("Error cargando reunión:", error);
 
         setErrorMessage(
-          `No fue posible cargar la asistencia: ${attendanceError.message}`,
+          error instanceof Error
+            ? `No fue posible cargar la reunión: ${error.message}`
+            : "No fue posible cargar la reunión.",
         );
-
+      } finally {
         setLoadingAttendance(false);
-        return;
       }
-
-      const memberIds = new Set(
-        ((attendanceData ?? []) as AttendanceRow[]).map(
-          (row) => row.member_id,
-        ),
-      );
-
-      setPresentMemberIds(memberIds);
-      setLoadingAttendance(false);
     }, []);
 
   useEffect(() => {
@@ -325,12 +244,12 @@ setMeetingId(meetingData.id);
     event.preventDefault();
 
     if (!canManageMembers) {
-  setErrorMessage(
-    "Tu cuenta no tiene permiso para agregar miembros.",
-  );
+      setErrorMessage(
+        "Tu cuenta no tiene permiso para agregar miembros.",
+      );
 
-  return;
-}
+      return;
+    }
 
     const cleanName = fullName.trim();
     const cleanFamily = familyName.trim();
@@ -346,57 +265,42 @@ setMeetingId(meetingData.id);
     setSavingMember(true);
     setErrorMessage("");
 
-    const { data, error } = await supabase
-      .from("members")
-      .insert({
-        full_name: cleanName,
-        family_name: cleanFamily || null,
+    try {
+      const newMember = await createMember({
+        fullName: cleanName,
+        familyName: cleanFamily,
         organization,
-        recent_convert: recentConvert,
-        active: true,
-      })
-      .select(
-        `
-          id,
-          full_name,
-          family_name,
-          organization,
-          recent_convert,
-          active,
-          created_at
-        `,
-      )
-      .single();
+        recentConvert,
+      });
 
-    if (error || !data) {
-      console.error("Error agregando miembro:", error);
-
-      setErrorMessage(
-        `No fue posible agregar el miembro: ${
-          error?.message ??
-          "Supabase no devolvió el registro"
-        }`,
+      setMembers((currentMembers) =>
+        [...currentMembers, newMember].sort(
+          (memberA, memberB) =>
+            memberA.full_name.localeCompare(
+              memberB.full_name,
+              "es",
+            ),
+        ),
       );
 
+      setFullName("");
+      setFamilyName("");
+      setOrganization("Cuórum de Élderes");
+      setRecentConvert(false);
+    } catch (error) {
+      console.error(
+        "Error agregando miembro:",
+        error,
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? `No fue posible agregar el miembro: ${error.message}`
+          : "No fue posible agregar el miembro.",
+      );
+    } finally {
       setSavingMember(false);
-      return;
     }
-
-    setMembers((currentMembers) =>
-      [...currentMembers, data as Member].sort(
-        (memberA, memberB) =>
-          memberA.full_name.localeCompare(
-            memberB.full_name,
-            "es",
-          ),
-      ),
-    );
-
-    setFullName("");
-    setFamilyName("");
-    setOrganization("Cuórum de Élderes");
-    setRecentConvert(false);
-    setSavingMember(false);
   }
 
   async function deleteMember(member: Member) {
@@ -405,303 +309,275 @@ setMeetingId(meetingData.id);
     );
 
     if (!canManageMembers) {
-  setErrorMessage(
-    "Tu cuenta no tiene permiso para eliminar miembros.",
-  );
-
-  return;
-}
-
-    if (!confirmed) return;
-
-    setErrorMessage("");
-
-    const { error } = await supabase
-      .from("members")
-      .delete()
-      .eq("id", member.id);
-
-    if (error) {
-      console.error("Error eliminando miembro:", error);
-
       setErrorMessage(
-        `No fue posible eliminar el miembro: ${error.message}`,
+        "Tu cuenta no tiene permiso para eliminar miembros.",
       );
 
       return;
     }
 
-    setMembers((currentMembers) =>
-      currentMembers.filter(
-        (currentMember) =>
-          currentMember.id !== member.id,
-      ),
-    );
+    if (!confirmed) return;
 
-    setPresentMemberIds((currentIds) => {
-      const updatedIds = new Set(currentIds);
-      updatedIds.delete(member.id);
-      return updatedIds;
-    });
+    setErrorMessage("");
+
+    try {
+      await removeMember(member.id);
+
+      setMembers((currentMembers) =>
+        currentMembers.filter(
+          (currentMember) =>
+            currentMember.id !== member.id,
+        ),
+      );
+
+      setPresentMemberIds((currentIds) => {
+        const updatedIds = new Set(currentIds);
+
+        updatedIds.delete(member.id);
+
+        return updatedIds;
+      });
+    } catch (error) {
+      console.error(
+        "Error eliminando miembro:",
+        error,
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? `No fue posible eliminar el miembro: ${error.message}`
+          : "No fue posible eliminar el miembro.",
+      );
+    }
   }
 
   async function toggleAttendance(member: Member) {
-    if (!meetingId) {
-      setErrorMessage(
-        "La reunión todavía no está lista.",
-      );
+  if (!canRecordAttendance) {
+    setErrorMessage(
+      "Tu cuenta no tiene permiso para registrar asistencia.",
+    );
 
-      if (!canManageMembers) {
-  setErrorMessage(
-    "Tu cuenta no tiene permiso para eliminar miembros.",
-  );
+    return;
+  }
 
-  return;
-}
+  if (!meetingId) {
+    setErrorMessage(
+      "La reunión todavía no está lista.",
+    );
 
-      return;
-    }
+    return;
+  }
 
-    setChangingAttendance(member.id);
-    setErrorMessage("");
+  setChangingAttendance(member.id);
+  setErrorMessage("");
 
-    const currentlyPresent =
-      presentMemberIds.has(member.id);
+  const currentlyPresent =
+    presentMemberIds.has(member.id);
 
+  try {
     if (currentlyPresent) {
-      const { error } = await supabase
-        .from("attendance")
-        .delete()
-        .eq("meeting_id", meetingId)
-        .eq("member_id", member.id);
-
-      if (error) {
-        console.error(
-          "Error eliminando asistencia:",
-          error,
-        );
-
-        setErrorMessage(
-          `No fue posible quitar la asistencia: ${error.message}`,
-        );
-
-        setChangingAttendance(null);
-        return;
-      }
+      await removeAttendance(
+        meetingId,
+        member.id,
+      );
 
       setPresentMemberIds((currentIds) => {
         const updatedIds = new Set(currentIds);
+
         updatedIds.delete(member.id);
+
         return updatedIds;
       });
+    } else {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-      setChangingAttendance(null);
-      return;
-    }
+      if (userError || !user) {
+        throw new Error(
+          "No existe una sesión válida.",
+        );
+      }
 
-    const { data: userData, error: userError } =
-      await supabase.auth.getUser();
-
-    if (userError || !userData.user) {
-      setErrorMessage(
-        "No existe una sesión válida. Vuelve a iniciar sesión.",
+      await addAttendance(
+        meetingId,
+        member.id,
+        user.id,
       );
 
-      setChangingAttendance(null);
-      return;
-    }
+      setPresentMemberIds((currentIds) => {
+        const updatedIds = new Set(currentIds);
 
-    const { error } = await supabase
-      .from("attendance")
-      .insert({
-        meeting_id: meetingId,
-        member_id: member.id,
-        present: true,
-        recorded_by: userData.user.id,
+        updatedIds.add(member.id);
+
+        return updatedIds;
       });
-
-    if (error) {
-      console.error(
-        "Error registrando asistencia:",
-        error,
-      );
-
-      setErrorMessage(
-        `No fue posible registrar la asistencia: ${error.message}`,
-      );
-
-      setChangingAttendance(null);
-      return;
     }
+  } catch (error) {
+    console.error(
+      "Error cambiando asistencia:",
+      error,
+    );
 
-    setPresentMemberIds((currentIds) => {
-      const updatedIds = new Set(currentIds);
-      updatedIds.add(member.id);
-      return updatedIds;
-    });
-
+    setErrorMessage(
+      error instanceof Error
+        ? `No fue posible cambiar la asistencia: ${error.message}`
+        : "No fue posible cambiar la asistencia.",
+    );
+  } finally {
     setChangingAttendance(null);
   }
+}
 
-  async function markWholeFamily(
-    familyMembers: Member[],
-  ) {
-    if (!meetingId) {
-      setErrorMessage(
-        "La reunión todavía no está lista.",
+async function markWholeFamily(
+  familyMembers: Member[],
+) {
+  if (!canRecordAttendance) {
+    setErrorMessage(
+      "Tu cuenta no tiene permiso para registrar asistencia.",
+    );
+
+    return;
+  }
+
+  if (!meetingId) {
+    setErrorMessage(
+      "La reunión todavía no está lista.",
+    );
+
+    return;
+  }
+
+  setErrorMessage("");
+
+  const familyMemberIds = familyMembers.map(
+    (member) => member.id,
+  );
+
+  const allPresent = familyMemberIds.every(
+    (memberId) =>
+      presentMemberIds.has(memberId),
+  );
+
+  try {
+    if (allPresent) {
+      await removeFamilyAttendance(
+        meetingId,
+        familyMemberIds,
+      );
+
+      setPresentMemberIds(
+        (currentIds) => {
+          const updatedIds =
+            new Set(currentIds);
+
+          familyMemberIds.forEach(
+            (memberId) =>
+              updatedIds.delete(memberId),
+          );
+
+          return updatedIds;
+        },
       );
 
       return;
     }
 
-    if (!canManageMembers) {
-  setErrorMessage(
-    "Tu cuenta no tiene permiso para eliminar miembros.",
-  );
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-  return;
-}
+    if (userError || !user) {
+      throw new Error(
+        "No existe una sesión válida.",
+      );
+    }
 
-    setErrorMessage("");
+    const missingMemberIds =
+      familyMemberIds.filter(
+        (memberId) =>
+          !presentMemberIds.has(memberId),
+      );
 
-    const familyMemberIds = familyMembers.map(
-      (member) => member.id,
+    await addFamilyAttendance(
+      meetingId,
+      missingMemberIds,
+      user.id,
     );
 
-    const allPresent = familyMemberIds.every(
-      (memberId) =>
-        presentMemberIds.has(memberId),
-    );
+    setPresentMemberIds(
+      (currentIds) => {
+        const updatedIds =
+          new Set(currentIds);
 
-    if (allPresent) {
-      const { error } = await supabase
-        .from("attendance")
-        .delete()
-        .eq("meeting_id", meetingId)
-        .in("member_id", familyMemberIds);
-
-      if (error) {
-        console.error(
-          "Error desmarcando familia:",
-          error,
-        );
-
-        setErrorMessage(
-          `No fue posible desmarcar la familia: ${error.message}`,
-        );
-
-        return;
-      }
-
-      setPresentMemberIds((currentIds) => {
-        const updatedIds = new Set(currentIds);
-
-        familyMemberIds.forEach((memberId) =>
-          updatedIds.delete(memberId),
+        missingMemberIds.forEach(
+          (memberId) =>
+            updatedIds.add(memberId),
         );
 
         return updatedIds;
-      });
-
-      return;
-    }
-
-    const { data: userData, error: userError } =
-      await supabase.auth.getUser();
-
-    if (userError || !userData.user) {
-      setErrorMessage(
-        "No existe una sesión válida. Vuelve a iniciar sesión.",
-      );
-
-      return;
-    }
-
-    const missingMemberIds = familyMemberIds.filter(
-      (memberId) =>
-        !presentMemberIds.has(memberId),
+      },
+    );
+  } catch (error) {
+    console.error(
+      "Error cambiando familia:",
+      error,
     );
 
-    const newRecords = missingMemberIds.map(
-      (memberId) => ({
-        meeting_id: meetingId,
-        member_id: memberId,
-        present: true,
-        recorded_by: userData.user!.id,
-      }),
+    setErrorMessage(
+      error instanceof Error
+        ? `No fue posible cambiar la familia: ${error.message}`
+        : "No fue posible cambiar la familia.",
     );
-
-    if (newRecords.length === 0) return;
-
-    const { error } = await supabase
-      .from("attendance")
-      .insert(newRecords);
-
-    if (error) {
-      console.error(
-        "Error marcando familia:",
-        error,
-      );
-
-      setErrorMessage(
-        `No fue posible marcar la familia: ${error.message}`,
-      );
-
-      return;
-    }
-
-    setPresentMemberIds((currentIds) => {
-      const updatedIds = new Set(currentIds);
-
-      missingMemberIds.forEach((memberId) =>
-        updatedIds.add(memberId),
-      );
-
-      return updatedIds;
-    });
   }
-
-  async function clearMeetingAttendance() {
-    if (!meetingId) return;
-
-    const confirmed = window.confirm(
-      `¿Deseas borrar toda la asistencia del ${formatMeetingDate(
-        meetingDate,
-      )}?`,
-    );
-
-    if (!canManageMembers) {
-  setErrorMessage(
-    "Tu cuenta no tiene permiso para eliminar miembros.",
-  );
-
-  return;
 }
 
-    if (!confirmed) return;
+async function clearMeetingAttendance() {
+  if (!canRecordAttendance) {
+    setErrorMessage(
+      "Tu cuenta no tiene permiso para limpiar la asistencia.",
+    );
 
-    setErrorMessage("");
+    return;
+  }
 
-    const { error } = await supabase
-      .from("attendance")
-      .delete()
-      .eq("meeting_id", meetingId);
+  if (!meetingId) {
+    setErrorMessage(
+      "La reunión todavía no está lista.",
+    );
 
-    if (error) {
-      console.error(
-        "Error limpiando asistencia:",
-        error,
-      );
+    return;
+  }
 
-      setErrorMessage(
-        `No fue posible limpiar la asistencia: ${error.message}`,
-      );
+  const confirmed = window.confirm(
+    `¿Deseas borrar toda la asistencia del ${formatMeetingDate(
+      meetingDate,
+    )}?`,
+  );
 
-      return;
-    }
+  if (!confirmed) return;
+
+  setErrorMessage("");
+
+  try {
+    await clearAttendance(meetingId);
 
     setPresentMemberIds(new Set());
+  } catch (error) {
+    console.error(
+      "Error limpiando asistencia:",
+      error,
+    );
+
+    setErrorMessage(
+      error instanceof Error
+        ? `No fue posible limpiar la asistencia: ${error.message}`
+        : "No fue posible limpiar la asistencia.",
+    );
   }
+}
 
   const loading =
   loadingMembers ||
@@ -1261,39 +1137,3 @@ type MetricCardProps = {
   label: string;
 };
 
-type SummaryMemberProps = {
-  member: Member;
-  status: string;
-  present?: boolean;
-};
-
-function SummaryMember({
-  member,
-  status,
-  present = false,
-}: SummaryMemberProps) {
-  return (
-    <article className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
-      <div>
-        <h3 className="font-bold">
-          {member.full_name}
-        </h3>
-
-        <p className="text-sm text-slate-500">
-          {member.family_name || "Sin familia"} ·{" "}
-          {member.organization}
-        </p>
-      </div>
-
-      <span
-        className={`rounded-full px-3 py-1 text-xs font-bold ${
-          present
-            ? "bg-emerald-100 text-emerald-800"
-            : "bg-amber-100 text-amber-800"
-        }`}
-      >
-        {status}
-      </span>
-    </article>
-  );
-}
