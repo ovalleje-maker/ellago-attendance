@@ -12,27 +12,15 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import type { Member, Organization } from "@/types/member";
 
 import type { AttendanceRow, Meeting, AppTab } from "@/types/navigation";
+import {
+  formatMeetingDate,
+  getMostRecentSunday,
+} from "@/utils/dates";
+import EmptyMessage from "@/components/ui/EmptyMessage";
+import ErrorAlert from "@/components/ui/ErrorAlert";
+import MetricCard from "@/components/ui/MetricCard";
+import NavigationButton from "@/components/ui/NavigationButton";
 
-function getMostRecentSunday(): string {
-  const date = new Date();
-  const day = date.getDay();
-
-  date.setDate(date.getDate() - day);
-
-  return date.toISOString().slice(0, 10);
-}
-
-function formatDate(dateValue: string): string {
-  if (!dateValue) return "";
-
-  return new Intl.DateTimeFormat("es-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${dateValue}T12:00:00Z`));
-}
 
 export default function Home() {
   const {
@@ -677,7 +665,7 @@ setMeetingId(meetingData.id);
     if (!meetingId) return;
 
     const confirmed = window.confirm(
-      `¿Deseas borrar toda la asistencia del ${formatDate(
+      `¿Deseas borrar toda la asistencia del ${formatMeetingDate(
         meetingDate,
       )}?`,
     );
@@ -767,22 +755,9 @@ setMeetingId(meetingData.id);
       </nav>
 
       <div className="mx-auto max-w-5xl p-4 sm:p-6">
-        {profileError && (
-  <div
-    role="alert"
-    className="mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800"
-  >
-    {profileError}
-  </div>
-)}
-        {errorMessage && (
-          <div
-            role="alert"
-            className="mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800"
-          >
-            {errorMessage}
-          </div>
-        )}
+       <ErrorAlert message={profileError} />
+
+        <ErrorAlert message={errorMessage} />
 
         {loading && (
           <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-800">
@@ -812,7 +787,7 @@ setMeetingId(meetingData.id);
               />
 
               <p className="mt-2 text-sm capitalize text-slate-500">
-                {formatDate(meetingDate)}
+                {formatMeetingDate(meetingDate)}
               </p>
             </div>
 
@@ -1011,7 +986,7 @@ setMeetingId(meetingData.id);
               </p>
 
               <h2 className="mt-2 text-xl font-bold capitalize">
-                {formatDate(meetingDate)}
+                {formatMeetingDate(meetingDate)}
               </h2>
             </div>
 
@@ -1281,47 +1256,10 @@ type NavigationButtonProps = {
   onClick: () => void;
 };
 
-function NavigationButton({
-  active,
-  label,
-  onClick,
-}: NavigationButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`border-b-4 px-2 py-4 text-sm font-bold sm:text-base ${
-        active
-          ? "border-emerald-700 text-emerald-800"
-          : "border-transparent text-slate-500 hover:text-slate-800"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
 type MetricCardProps = {
   number: number | string;
   label: string;
 };
-
-function MetricCard({
-  number,
-  label,
-}: MetricCardProps) {
-  return (
-    <article className="rounded-2xl bg-white p-4 text-center shadow-sm">
-      <strong className="block text-2xl font-bold text-emerald-800">
-        {number}
-      </strong>
-
-      <span className="mt-1 block text-xs font-semibold text-slate-500 sm:text-sm">
-        {label}
-      </span>
-    </article>
-  );
-}
 
 type SummaryMemberProps = {
   member: Member;
@@ -1357,17 +1295,5 @@ function SummaryMember({
         {status}
       </span>
     </article>
-  );
-}
-
-function EmptyMessage({
-  message,
-}: {
-  message: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
-      {message}
-    </div>
   );
 }
