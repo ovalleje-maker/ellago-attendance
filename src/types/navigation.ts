@@ -7,4 +7,8 @@ export type AttendanceRow = {
   member_id: string;
 };
 
-export type AppTab = "attendance" | "summary" | "members";
+export type AppTab =
+  | "dashboard"
+  | "attendance"
+  | "summary"
+  | "members";

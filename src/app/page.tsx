@@ -21,6 +21,7 @@ import ErrorAlert from "@/components/ui/ErrorAlert";
 import MetricCard from "@/components/ui/MetricCard";
 import NavigationButton from "@/components/ui/NavigationButton";
 import SummaryMember from "@/components/attendance/SummaryMember";
+import BishopDashboard from "@/components/dashboard/BishopDashboard";
 import {
   createMember,
   getActiveMembers,
@@ -58,7 +59,7 @@ const canRecordAttendance =
   profile?.role === "secretary" ||
   profile?.role === "leader";
   const [activeTab, setActiveTab] =
-    useState<AppTab>("attendance");
+    useState<AppTab>("dashboard");
 
   const [members, setMembers] = useState<Member[]>([]);
   const [presentMemberIds, setPresentMemberIds] =
@@ -603,7 +604,16 @@ async function clearMeetingAttendance() {
       </header>
 
       <nav className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto grid max-w-5xl grid-cols-3">
+        <div className="mx-auto grid max-w-5xl grid-cols-4">
+
+          <NavigationButton
+            active={activeTab === "dashboard"}
+            label="Dashboard"
+            onClick={() =>
+              setActiveTab("dashboard")
+  }
+/>
+
           <NavigationButton
             active={activeTab === "attendance"}
             label="Asistencia"
@@ -640,6 +650,14 @@ async function clearMeetingAttendance() {
             Cargando información desde Supabase...
           </div>
         )}
+
+        {activeTab === "dashboard" && (
+         <BishopDashboard
+           members={members}
+           presentMemberIds={presentMemberIds}
+           meetingDate={meetingDate}
+  />
+)}
 
         {activeTab === "attendance" && (
           <section>
