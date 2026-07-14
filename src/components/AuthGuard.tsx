@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { getRoleLabel } from "@/types/profile";
 
 type AuthGuardProps = {
   children: ReactNode;
@@ -19,6 +21,12 @@ export default function AuthGuard({
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+
+  const {
+  profile,
+  loadingProfile,
+  profileError,
+} = useUserProfile();
 
   const isLoginPage = pathname === "/login";
 
@@ -94,7 +102,7 @@ export default function AuthGuard({
     return <>{children}</>;
   }
 
-  if (loading) {
+  if (loading || loadingProfile) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100">
         <p className="font-semibold text-slate-600">
@@ -103,6 +111,30 @@ export default function AuthGuard({
       </main>
     );
   }
+
+  if (profileError) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
+      <div className="w-full max-w-lg rounded-2xl border border-red-300 bg-white p-6 text-center shadow">
+        <h1 className="text-xl font-bold text-red-800">
+          Cuenta sin autorización
+        </h1>
+
+        <p className="mt-3 text-slate-600">
+          {profileError}
+        </p>
+
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="mt-5 rounded-xl bg-slate-800 px-5 py-3 font-bold text-white"
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </main>
+  );
+}
 
   if (!session) {
     return (
@@ -124,8 +156,17 @@ export default function AuthGuard({
             </p>
 
             <p className="truncate text-sm font-semibold text-slate-800">
-              {session.user.email}
-            </p>
+  {profile?.full_name || session.user.email}
+</p>
+
+<p className="text-xs text-emerald-700">
+  {profile
+    ? getRoleLabel(profile.role)
+    : "Usuario autorizado"}
+  {profile?.organization
+    ? ` · ${profile.organization}`
+    : ""}
+</p>
           </div>
 
           <button

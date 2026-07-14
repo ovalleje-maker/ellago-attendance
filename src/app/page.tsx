@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { supabase } from "@/lib/supabase";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 type Organization =
   | "Cuórum de Élderes"
@@ -60,6 +61,21 @@ function formatDate(dateValue: string): string {
 }
 
 export default function Home() {
+  const {
+  profile,
+  loadingProfile,
+  profileError,
+} = useUserProfile();
+
+const canManageMembers =
+  profile?.role === "bishop" ||
+  profile?.role === "counselor";
+
+const canRecordAttendance =
+  profile?.role === "bishop" ||
+  profile?.role === "counselor" ||
+  profile?.role === "secretary" ||
+  profile?.role === "leader";
   const [activeTab, setActiveTab] =
     useState<Tab>("attendance");
 
@@ -162,47 +178,73 @@ export default function Home() {
         return;
       }
 
-      const { data: meetingData, error: meetingError } =
-        await supabase
-          .from("meetings")
-          .upsert(
-            {
-              meeting_date: date,
-              meeting_type: "sacrament",
-            },
-            {
-              onConflict: "meeting_date",
-            },
-          )
-          .select("id, meeting_date")
-          .single();
+      let meetingData: Meeting | null = null;
 
-      if (meetingError || !meetingData) {
-        console.error(
-          "Error creando o cargando reunión:",
-          meetingError,
-        );
+const {
+  data: existingMeeting,
+  error: searchMeetingError,
+} = await supabase
+  .from("meetings")
+  .select("id, meeting_date")
+  .eq("meeting_date", date)
+  .maybeSingle();
 
-        setErrorMessage(
-          `No fue posible cargar la reunión: ${
-            meetingError?.message ??
-            "Respuesta vacía de Supabase"
-          }`,
-        );
+if (searchMeetingError) {
+  console.error(
+    "Error buscando reunión:",
+    searchMeetingError,
+  );
 
-        setLoadingAttendance(false);
-        return;
-      }
+  setErrorMessage(
+    `No fue posible buscar la reunión: ${searchMeetingError.message}`,
+  );
 
-      const meeting = meetingData as Meeting;
+  setLoadingAttendance(false);
+  return;
+}
 
-      setMeetingId(meeting.id);
+if (existingMeeting) {
+  meetingData = existingMeeting as Meeting;
+} else {
+  const {
+    data: createdMeeting,
+    error: createMeetingError,
+  } = await supabase
+    .from("meetings")
+    .insert({
+      meeting_date: date,
+      meeting_type: "sacrament",
+    })
+    .select("id, meeting_date")
+    .single();
+
+  if (createMeetingError || !createdMeeting) {
+    console.error(
+      "Error creando reunión:",
+      createMeetingError,
+    );
+
+    setErrorMessage(
+      `No fue posible crear la reunión: ${
+        createMeetingError?.message ??
+        "Supabase no devolvió la reunión"
+      }`,
+    );
+
+    setLoadingAttendance(false);
+    return;
+  }
+
+  meetingData = createdMeeting as Meeting;
+}
+
+setMeetingId(meetingData.id);
 
       const { data: attendanceData, error: attendanceError } =
         await supabase
           .from("attendance")
           .select("member_id")
-          .eq("meeting_id", meeting.id)
+          .eq("meeting_id", meetingData.id)
           .eq("present", true);
 
       if (attendanceError) {
@@ -320,6 +362,14 @@ export default function Home() {
   ) {
     event.preventDefault();
 
+    if (!canManageMembers) {
+  setErrorMessage(
+    "Tu cuenta no tiene permiso para agregar miembros.",
+  );
+
+  return;
+}
+
     const cleanName = fullName.trim();
     const cleanFamily = familyName.trim();
 
@@ -392,6 +442,14 @@ export default function Home() {
       `¿Estás seguro de que deseas eliminar a ${member.full_name}?`,
     );
 
+    if (!canManageMembers) {
+  setErrorMessage(
+    "Tu cuenta no tiene permiso para eliminar miembros.",
+  );
+
+  return;
+}
+
     if (!confirmed) return;
 
     setErrorMessage("");
@@ -430,6 +488,14 @@ export default function Home() {
       setErrorMessage(
         "La reunión todavía no está lista.",
       );
+
+      if (!canManageMembers) {
+  setErrorMessage(
+    "Tu cuenta no tiene permiso para eliminar miembros.",
+  );
+
+  return;
+}
 
       return;
     }
@@ -525,6 +591,14 @@ export default function Home() {
 
       return;
     }
+
+    if (!canManageMembers) {
+  setErrorMessage(
+    "Tu cuenta no tiene permiso para eliminar miembros.",
+  );
+
+  return;
+}
 
     setErrorMessage("");
 
@@ -634,6 +708,14 @@ export default function Home() {
       )}?`,
     );
 
+    if (!canManageMembers) {
+  setErrorMessage(
+    "Tu cuenta no tiene permiso para eliminar miembros.",
+  );
+
+  return;
+}
+
     if (!confirmed) return;
 
     setErrorMessage("");
@@ -660,7 +742,9 @@ export default function Home() {
   }
 
   const loading =
-    loadingMembers || loadingAttendance;
+  loadingMembers ||
+  loadingAttendance ||
+  loadingProfile;
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -709,6 +793,14 @@ export default function Home() {
       </nav>
 
       <div className="mx-auto max-w-5xl p-4 sm:p-6">
+        {profileError && (
+  <div
+    role="alert"
+    className="mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800"
+  >
+    {profileError}
+  </div>
+)}
         {errorMessage && (
           <div
             role="alert"
@@ -766,7 +858,7 @@ export default function Home() {
                 label="Asistencia"
               />
             </div>
-
+          
             <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-3 sm:flex-row">
                 <input
@@ -785,6 +877,7 @@ export default function Home() {
                   type="button"
                   onClick={clearMeetingAttendance}
                   disabled={
+                    !canRecordAttendance ||
                     loadingAttendance ||
                     presentMemberIds.size === 0
                   }
@@ -828,6 +921,7 @@ export default function Home() {
                       <button
                         type="button"
                         disabled={
+                          !canRecordAttendance ||
                           isChanging ||
                           loadingAttendance
                         }
@@ -907,6 +1001,7 @@ export default function Home() {
                           <button
                             type="button"
                             disabled={
+                              !canRecordAttendance ||
                               loadingAttendance
                             }
                             onClick={() =>
@@ -1008,6 +1103,7 @@ export default function Home() {
 
         {activeTab === "members" && (
           <section>
+            {canManageMembers && (
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <h2 className="text-xl font-bold">
                 Agregar miembro
@@ -1119,6 +1215,7 @@ export default function Home() {
                 </button>
               </form>
             </div>
+          )}
 
             <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
               <div>
@@ -1170,6 +1267,7 @@ export default function Home() {
                         )}
                       </div>
 
+                    {canManageMembers && (
                       <button
                         type="button"
                         onClick={() =>
@@ -1179,6 +1277,7 @@ export default function Home() {
                       >
                         Eliminar
                       </button>
+                    )} 
                     </article>
                   ),
                 )}
