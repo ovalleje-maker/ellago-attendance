@@ -39,6 +39,7 @@ import {
 import { useAttendanceHistory } from "@/hooks/useAttendanceHistory";
 import AppNavigation from "@/components/layout/AppNavigation";
 import AttendanceSummaryView from "@/components/summary/AttendanceSummaryView";
+import MembersView from "@/components/members/MembersView";
 
 
 export default function Home() {
@@ -859,201 +860,43 @@ await reloadHistory();
   />
 )}
 
-        {activeTab === "members" && (
-          <section>
-            {canManageMembers && (
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-bold">
-                Agregar miembro
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                El miembro se guardará en Supabase.
-              </p>
-
-              <form
-                onSubmit={addMember}
-                className="mt-4 grid gap-4 sm:grid-cols-2"
-              >
-                <label className="block">
-                  <span className="text-sm font-bold text-slate-700">
-                    Nombre completo
-                  </span>
-
-                  <input
-                    type="text"
-                    value={fullName}
-                    disabled={savingMember}
-                    onChange={(event) =>
-                      setFullName(event.target.value)
-                    }
-                    placeholder="Ej. María López"
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-bold text-slate-700">
-                    Familia
-                  </span>
-
-                  <input
-                    type="text"
-                    value={familyName}
-                    disabled={savingMember}
-                    onChange={(event) =>
-                      setFamilyName(
-                        event.target.value,
-                      )
-                    }
-                    placeholder="Ej. Familia López"
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
-                  />
-                </label>
-
-                <label className="block sm:col-span-2">
-                  <span className="text-sm font-bold text-slate-700">
-                    Organización
-                  </span>
-
-                  <select
-                    value={organization}
-                    disabled={savingMember}
-                    onChange={(event) =>
-                      setOrganization(
-                        event.target
-                          .value as Organization,
-                      )
-                    }
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
-                  >
-                    <option>
-                      Cuórum de Élderes
-                    </option>
-                    <option>
-                      Sociedad de Socorro
-                    </option>
-                    <option>
-                      Hombres Jóvenes
-                    </option>
-                    <option>
-                      Mujeres Jóvenes
-                    </option>
-                    <option>Primaria</option>
-                    <option>Otro</option>
-                  </select>
-                </label>
-
-                <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    checked={recentConvert}
-                    disabled={savingMember}
-                    onChange={(event) =>
-                      setRecentConvert(
-                        event.target.checked,
-                      )
-                    }
-                    className="h-5 w-5"
-                  />
-
-                  <span className="font-semibold text-slate-700">
-                    Converso reciente
-                  </span>
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={savingMember}
-                  className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-400 sm:col-span-2"
-                >
-                  {savingMember
-                    ? "Guardando..."
-                    : "Agregar miembro"}
-                </button>
-              </form>
-            </div>
-          )}
-
-            <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-              <div>
-                <h2 className="text-xl font-bold">
-                  Directorio
-                </h2>
-
-                <p className="text-sm text-slate-500">
-                  {members.length} miembro
-                  {members.length === 1 ? "" : "s"}{" "}
-                  almacenado
-                  {members.length === 1 ? "" : "s"}{" "}
-                  en Supabase
-                </p>
-              </div>
-
-              <input
-                type="search"
-                value={memberSearch}
-                onChange={(event) =>
-                  setMemberSearch(event.target.value)
-                }
-                placeholder="Buscar miembro..."
-                className="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700"
-              />
-
-              <div className="mt-4 space-y-3">
-                {filteredDirectoryMembers.map(
-                  (member) => (
-                    <article
-                      key={member.id}
-                      className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4"
-                    >
-                      <div>
-                        <h3 className="font-bold">
-                          {member.full_name}
-                        </h3>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                          {member.family_name ||
-                            "Sin familia"}{" "}
-                          · {member.organization}
-                        </p>
-
-                        {member.recent_convert && (
-                          <span className="mt-2 inline-block rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800">
-                            Converso reciente
-                          </span>
-                        )}
-                      </div>
-
-                    {canManageMembers && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          deleteMember(member)
-                        }
-                        className="rounded-xl bg-red-100 px-4 py-2 font-bold text-red-700 hover:bg-red-200"
-                      >
-                        Eliminar
-                      </button>
-                    )} 
-                    </article>
-                  ),
-                )}
-
-                {!loadingMembers &&
-                  members.length === 0 && (
-                    <EmptyMessage message="Todavía no hay miembros almacenados en Supabase." />
-                  )}
-
-                {members.length > 0 &&
-                  filteredDirectoryMembers.length ===
-                    0 && (
-                    <EmptyMessage message="No se encontraron miembros." />
-                  )}
-              </div>
-            </div>
-          </section>
-        )}
+{activeTab === "members" && (
+  <MembersView
+    members={members}
+    filteredMembers={
+      filteredDirectoryMembers
+    }
+    memberSearch={memberSearch}
+    fullName={fullName}
+    familyName={familyName}
+    organization={organization}
+    recentConvert={recentConvert}
+    loadingMembers={loadingMembers}
+    savingMember={savingMember}
+    canManageMembers={
+      canManageMembers
+    }
+    onSearchChange={
+      setMemberSearch
+    }
+    onFullNameChange={
+      setFullName
+    }
+    onFamilyNameChange={
+      setFamilyName
+    }
+    onOrganizationChange={
+      setOrganization
+    }
+    onRecentConvertChange={
+      setRecentConvert
+    }
+    onAddMember={addMember}
+    onDeleteMember={
+      deleteMember
+    }
+  />
+)}
       </div>
     </main>
   );
