@@ -1,0 +1,42 @@
+﻿import NavigationButton from "@/components/ui/NavigationButton";
+import type { AppTab } from "@/types/navigation";
+
+type AppNavigationProps = {
+  activeTab: AppTab;
+  onTabChange: (tab: AppTab) => void;
+};
+
+export default function AppNavigation({
+  activeTab,
+  onTabChange,
+}: AppNavigationProps) {
+  return (
+    <nav className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
+      <div className="mx-auto grid max-w-5xl grid-cols-4">
+        <NavigationButton
+          active={activeTab === "dashboard"}
+          label="Dashboard"
+          onClick={() => onTabChange("dashboard")}
+        />
+
+        <NavigationButton
+          active={activeTab === "attendance"}
+          label="Asistencia"
+          onClick={() => onTabChange("attendance")}
+        />
+
+        <NavigationButton
+          active={activeTab === "summary"}
+          label="Resumen"
+          onClick={() => onTabChange("summary")}
+        />
+
+        <NavigationButton
+          active={activeTab === "members"}
+          label="Miembros"
+          onClick={() => onTabChange("members")}
+        />
+      </div>
+    </nav>
+  );
+}

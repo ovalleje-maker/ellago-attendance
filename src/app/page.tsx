@@ -10,7 +10,6 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import type { Member, Organization } from "@/types/member";
-
 import type { AppTab } from "@/types/navigation";
 import {
   formatMeetingDate,
@@ -19,19 +18,16 @@ import {
 import EmptyMessage from "@/components/ui/EmptyMessage";
 import ErrorAlert from "@/components/ui/ErrorAlert";
 import MetricCard from "@/components/ui/MetricCard";
-import NavigationButton from "@/components/ui/NavigationButton";
-import SummaryMember from "@/components/attendance/SummaryMember";
 import BishopDashboard from "@/components/dashboard/BishopDashboard";
+import AppHeader from "@/components/layout/AppHeader";
 import {
   createMember,
   getActiveMembers,
   removeMember,
 } from "@/services/membersService";
-
 import {
   getOrCreateMeeting,
 } from "@/services/meetingsService";
-
 import {
   addAttendance,
   addFamilyAttendance,
@@ -41,6 +37,8 @@ import {
   removeFamilyAttendance,
 } from "@/services/attendanceService";
 import { useAttendanceHistory } from "@/hooks/useAttendanceHistory";
+import AppNavigation from "@/components/layout/AppNavigation";
+import AttendanceSummaryView from "@/components/summary/AttendanceSummaryView";
 
 
 export default function Home() {
@@ -610,58 +608,12 @@ await reloadHistory();
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="bg-emerald-800 px-4 py-6 text-white shadow">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-100">
-            Reunión sacramental
-          </p>
+     <AppHeader />
 
-          <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
-            Asistencia del Barrio
-          </h1>
-
-          <p className="mt-2 text-sm text-emerald-100">
-            Información sincronizada con Supabase
-          </p>
-        </div>
-      </header>
-
-      <nav className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto grid max-w-5xl grid-cols-4">
-
-          <NavigationButton
-            active={activeTab === "dashboard"}
-            label="Dashboard"
-            onClick={() =>
-              setActiveTab("dashboard")
-  }
+<AppNavigation
+  activeTab={activeTab}
+  onTabChange={setActiveTab}
 />
-
-          <NavigationButton
-            active={activeTab === "attendance"}
-            label="Asistencia"
-            onClick={() =>
-              setActiveTab("attendance")
-            }
-          />
-
-          <NavigationButton
-            active={activeTab === "summary"}
-            label="Resumen"
-            onClick={() =>
-              setActiveTab("summary")
-            }
-          />
-
-          <NavigationButton
-            active={activeTab === "members"}
-            label="Miembros"
-            onClick={() =>
-              setActiveTab("members")
-            }
-          />
-        </div>
-      </nav>
 
       <div className="mx-auto max-w-5xl p-4 sm:p-6">
        <ErrorAlert message={profileError} />
@@ -675,14 +627,14 @@ await reloadHistory();
           </div>
         )}
 
-        {activeTab === "dashboard" && (
-     <BishopDashboard
-  members={members}
-  presentMemberIds={presentMemberIds}
-  meetingDate={meetingDate}
-  historicalMeetings={historicalMeetings}
-  memberHistories={memberHistories}
-/>
+       {activeTab === "dashboard" && (
+  <BishopDashboard
+    members={members}
+    presentMemberIds={presentMemberIds}
+    meetingDate={meetingDate}
+    historicalMeetings={historicalMeetings}
+    memberHistories={memberHistories}
+  />
 )}
 
         {activeTab === "attendance" && (
@@ -898,77 +850,14 @@ await reloadHistory();
           </section>
         )}
 
-        {activeTab === "summary" && (
-          <section>
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">
-                Resumen
-              </p>
-
-              <h2 className="mt-2 text-xl font-bold capitalize">
-                {formatMeetingDate(meetingDate)}
-              </h2>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <MetricCard
-                number={presentMembers.length}
-                label="Presentes"
-              />
-
-              <MetricCard
-                number={absentMembers.length}
-                label="Ausentes"
-              />
-
-              <MetricCard
-                number={`${attendancePercentage}%`}
-                label="Asistencia"
-              />
-            </div>
-
-            <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-bold">
-                Miembros presentes
-              </h2>
-
-              <div className="mt-4 space-y-2">
-                {presentMembers.length > 0 ? (
-                  presentMembers.map((member) => (
-                    <SummaryMember
-                      key={member.id}
-                      member={member}
-                      status="Presente"
-                      present
-                    />
-                  ))
-                ) : (
-                  <EmptyMessage message="No hay miembros marcados como presentes." />
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-bold">
-                Miembros ausentes
-              </h2>
-
-              <div className="mt-4 space-y-2">
-                {absentMembers.length > 0 ? (
-                  absentMembers.map((member) => (
-                    <SummaryMember
-                      key={member.id}
-                      member={member}
-                      status="Ausente"
-                    />
-                  ))
-                ) : (
-                  <EmptyMessage message="No hay miembros ausentes." />
-                )}
-              </div>
-            </div>
-          </section>
-        )}
+      {activeTab === "summary" && (
+  <AttendanceSummaryView
+    meetingDate={meetingDate}
+    presentMembers={presentMembers}
+    absentMembers={absentMembers}
+    attendancePercentage={attendancePercentage}
+  />
+)}
 
         {activeTab === "members" && (
           <section>
@@ -1169,15 +1058,3 @@ await reloadHistory();
     </main>
   );
 }
-
-type NavigationButtonProps = {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-};
-
-type MetricCardProps = {
-  number: number | string;
-  label: string;
-};
-
