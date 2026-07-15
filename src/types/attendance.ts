@@ -24,3 +24,33 @@ export const ORGANIZATIONS: Organization[] = [
   "Primaria",
   "Otro",
 ];
+
+export type Meeting = {
+  id: string;
+  meeting_date: string;
+};
+
+export type AttendanceRow = {
+  member_id: string;
+};
+
+export type HistoricalMeeting = {
+  id: string;
+  meeting_date: string;
+};
+
+export type HistoricalAttendanceRow = {
+  meeting_id: string;
+  member_id: string;
+  present: boolean;
+};
+
+export type MemberAttendanceHistory = {
+  memberId: string;
+  attendedMeetings: number;
+  totalMeetings: number;
+  percentage: number;
+  consecutiveAbsences: number;
+  lastAttendanceDate: string | null;
+  attendanceByDate: Record<string, boolean>;
+};

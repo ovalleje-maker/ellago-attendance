@@ -40,6 +40,7 @@ import {
   removeAttendance,
   removeFamilyAttendance,
 } from "@/services/attendanceService";
+import { useAttendanceHistory } from "@/hooks/useAttendanceHistory";
 
 
 export default function Home() {
@@ -100,6 +101,18 @@ const canRecordAttendance =
 
   const [errorMessage, setErrorMessage] =
     useState("");
+
+    const {
+  historicalMeetings,
+  memberHistories,
+  loadingHistory,
+  historyError,
+  reloadHistory,
+} = useAttendanceHistory({
+  members,
+  endDate: meetingDate,
+  numberOfWeeks: 8,
+});
 
   const loadMembers = useCallback(async () => {
   setLoadingMembers(true);
@@ -415,6 +428,7 @@ const canRecordAttendance =
         return updatedIds;
       });
     }
+    await reloadHistory();
   } catch (error) {
     console.error(
       "Error cambiando asistencia:",
@@ -482,6 +496,8 @@ async function markWholeFamily(
         },
       );
 
+      await reloadHistory();
+
       return;
     }
 
@@ -521,6 +537,9 @@ async function markWholeFamily(
         return updatedIds;
       },
     );
+
+await reloadHistory();
+
   } catch (error) {
     console.error(
       "Error cambiando familia:",
@@ -566,6 +585,9 @@ async function clearMeetingAttendance() {
     await clearAttendance(meetingId);
 
     setPresentMemberIds(new Set());
+
+await reloadHistory();
+
   } catch (error) {
     console.error(
       "Error limpiando asistencia:",
@@ -580,10 +602,11 @@ async function clearMeetingAttendance() {
   }
 }
 
-  const loading =
+ const loading =
   loadingMembers ||
   loadingAttendance ||
-  loadingProfile;
+  loadingProfile ||
+  loadingHistory;
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -644,6 +667,7 @@ async function clearMeetingAttendance() {
        <ErrorAlert message={profileError} />
 
         <ErrorAlert message={errorMessage} />
+        <ErrorAlert message={historyError} />
 
         {loading && (
           <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-800">
@@ -652,11 +676,13 @@ async function clearMeetingAttendance() {
         )}
 
         {activeTab === "dashboard" && (
-         <BishopDashboard
-           members={members}
-           presentMemberIds={presentMemberIds}
-           meetingDate={meetingDate}
-  />
+     <BishopDashboard
+  members={members}
+  presentMemberIds={presentMemberIds}
+  meetingDate={meetingDate}
+  historicalMeetings={historicalMeetings}
+  memberHistories={memberHistories}
+/>
 )}
 
         {activeTab === "attendance" && (

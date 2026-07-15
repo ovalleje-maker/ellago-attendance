@@ -13,17 +13,28 @@ import EmptyMessage from "@/components/ui/EmptyMessage";
 import {
   formatMeetingDate,
 } from "@/utils/dates";
+import type {
+  HistoricalMeeting,
+  MemberAttendanceHistory,
+} from "@/types/attendance";
+
+import AttendanceFollowUp from "@/components/dashboard/AttendanceFollowUp";
+import AttendanceHistoryTable from "@/components/dashboard/AttendanceHistoryTable";
 
 type BishopDashboardProps = {
   members: Member[];
   presentMemberIds: Set<string>;
   meetingDate: string;
+  historicalMeetings: HistoricalMeeting[];
+  memberHistories: MemberAttendanceHistory[];
 };
 
 export default function BishopDashboard({
   members,
   presentMemberIds,
   meetingDate,
+  historicalMeetings,
+  memberHistories,
 }: BishopDashboardProps) {
   const presentMembers = useMemo(
     () =>
@@ -288,6 +299,23 @@ export default function BishopDashboard({
           )}
         </div>
       </section>
+
+    <div className="mt-4">
+  <AttendanceFollowUp
+    members={members}
+    histories={memberHistories}
+  />
+</div>
+
+<div className="mt-4">
+  <AttendanceHistoryTable
+    members={members}
+    histories={memberHistories}
+    dates={historicalMeetings.map(
+      (meeting) => meeting.meeting_date,
+    )}
+  />
+</div>
     </section>
   );
 }

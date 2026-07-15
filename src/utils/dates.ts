@@ -22,3 +22,30 @@ export function formatMeetingDate(
     new Date(`${dateValue}T12:00:00Z`),
   );
 }
+
+export function getPreviousSundayDates(
+  endDate: string,
+  numberOfWeeks: number,
+): string[] {
+  if (!endDate || numberOfWeeks <= 0) {
+    return [];
+  }
+
+  const date = new Date(`${endDate}T12:00:00Z`);
+
+  const dates: string[] = [];
+
+  for (let index = 0; index < numberOfWeeks; index++) {
+    const currentDate = new Date(date);
+
+    currentDate.setUTCDate(
+      date.getUTCDate() - index * 7,
+    );
+
+    dates.push(
+      currentDate.toISOString().slice(0, 10),
+    );
+  }
+
+  return dates;
+}
