@@ -15,9 +15,7 @@ import {
   formatMeetingDate,
   getMostRecentSunday,
 } from "@/utils/dates";
-import EmptyMessage from "@/components/ui/EmptyMessage";
 import ErrorAlert from "@/components/ui/ErrorAlert";
-import MetricCard from "@/components/ui/MetricCard";
 import BishopDashboard from "@/components/dashboard/BishopDashboard";
 import AppHeader from "@/components/layout/AppHeader";
 import {
@@ -40,6 +38,7 @@ import { useAttendanceHistory } from "@/hooks/useAttendanceHistory";
 import AppNavigation from "@/components/layout/AppNavigation";
 import AttendanceSummaryView from "@/components/summary/AttendanceSummaryView";
 import MembersView from "@/components/members/MembersView";
+import AttendanceView from "@/components/attendance/AttendanceView";
 
 
 export default function Home() {
@@ -638,218 +637,58 @@ await reloadHistory();
   />
 )}
 
-        {activeTab === "attendance" && (
-          <section>
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <label
-                htmlFor="meetingDate"
-                className="block text-sm font-bold text-slate-700"
-              >
-                Fecha de la reunión
-              </label>
-
-              <input
-                id="meetingDate"
-                type="date"
-                value={meetingDate}
-                disabled={loadingAttendance}
-                onChange={(event) =>
-                  setMeetingDate(event.target.value)
-                }
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100 sm:max-w-xs"
-              />
-
-              <p className="mt-2 text-sm capitalize text-slate-500">
-                {formatMeetingDate(meetingDate)}
-              </p>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <MetricCard
-                number={presentMembers.length}
-                label="Presentes"
-              />
-
-              <MetricCard
-                number={absentMembers.length}
-                label="Ausentes"
-              />
-
-              <MetricCard
-                number={`${attendancePercentage}%`}
-                label="Asistencia"
-              />
-            </div>
-          
-            <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <input
-                  type="search"
-                  value={attendanceSearch}
-                  onChange={(event) =>
-                    setAttendanceSearch(
-                      event.target.value,
-                    )
-                  }
-                  placeholder="Buscar miembro, familia u organización..."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700"
-                />
-
-                <button
-                  type="button"
-                  onClick={clearMeetingAttendance}
-                  disabled={
-                    !canRecordAttendance ||
-                    loadingAttendance ||
-                    presentMemberIds.size === 0
-                  }
-                  className="rounded-xl border border-red-300 px-4 py-3 font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Limpiar día
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {filteredAttendanceMembers.map(
-                (member) => {
-                  const isPresent =
-                    presentMemberIds.has(member.id);
-
-                  const isChanging =
-                    changingAttendance === member.id;
-
-                  return (
-                    <article
-                      key={member.id}
-                      className={`flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-sm ${
-                        isPresent
-                          ? "border-emerald-300 bg-emerald-50"
-                          : "border-slate-200 bg-white"
-                      }`}
-                    >
-                      <div>
-                        <h2 className="font-bold">
-                          {member.full_name}
-                        </h2>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                          {member.family_name ||
-                            "Sin familia"}{" "}
-                          · {member.organization}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={
-                          !canRecordAttendance ||
-                          isChanging ||
-                          loadingAttendance
-                        }
-                        onClick={() =>
-                          toggleAttendance(member)
-                        }
-                        className={`min-w-28 rounded-xl px-4 py-3 font-bold disabled:cursor-not-allowed disabled:opacity-60 ${
-                          isPresent
-                            ? "bg-emerald-700 text-white"
-                            : "bg-slate-200 text-slate-700"
-                        }`}
-                      >
-                        {isChanging
-                          ? "Guardando..."
-                          : isPresent
-                            ? "✓ Presente"
-                            : "Marcar"}
-                      </button>
-                    </article>
-                  );
-                },
-              )}
-
-              {!loadingMembers &&
-                members.length === 0 && (
-                  <EmptyMessage message="Todavía no hay miembros registrados en Supabase." />
-                )}
-
-              {members.length > 0 &&
-                filteredAttendanceMembers.length ===
-                  0 && (
-                  <EmptyMessage message="No se encontraron miembros." />
-                )}
-            </div>
-
-            {families.length > 0 && (
-              <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
-                <h2 className="text-xl font-bold">
-                  Registrar por familia
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  El registro se guardará inmediatamente
-                  en Supabase.
-                </p>
-
-                <div className="mt-4 space-y-3">
-                  {families.map(
-                    ([family, familyMembers]) => {
-                      const allPresent =
-                        familyMembers.every(
-                          (member) =>
-                            presentMemberIds.has(
-                              member.id,
-                            ),
-                        );
-
-                      return (
-                        <div
-                          key={family}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
-                        >
-                          <div>
-                            <h3 className="font-bold">
-                              {family}
-                            </h3>
-
-                            <p className="text-sm text-slate-500">
-                              {familyMembers.length}{" "}
-                              miembro
-                              {familyMembers.length === 1
-                                ? ""
-                                : "s"}
-                            </p>
-                          </div>
-
-                          <button
-                            type="button"
-                            disabled={
-                              !canRecordAttendance ||
-                              loadingAttendance
-                            }
-                            onClick={() =>
-                              markWholeFamily(
-                                familyMembers,
-                              )
-                            }
-                            className={`rounded-xl px-4 py-3 font-bold disabled:opacity-50 ${
-                              allPresent
-                                ? "bg-red-100 text-red-700"
-                                : "bg-emerald-100 text-emerald-800"
-                            }`}
-                          >
-                            {allPresent
-                              ? "Desmarcar"
-                              : "Marcar familia"}
-                          </button>
-                        </div>
-                      );
-                    },
-                  )}
-                </div>
-              </div>
-            )}
-          </section>
-        )}
+      {activeTab === "attendance" && (
+  <AttendanceView
+    meetingDate={meetingDate}
+    attendanceSearch={
+      attendanceSearch
+    }
+    members={members}
+    filteredMembers={
+      filteredAttendanceMembers
+    }
+    presentMembers={
+      presentMembers
+    }
+    absentMembers={
+      absentMembers
+    }
+    families={families}
+    presentMemberIds={
+      presentMemberIds
+    }
+    changingAttendance={
+      changingAttendance
+    }
+    attendancePercentage={
+      attendancePercentage
+    }
+    loadingMembers={
+      loadingMembers
+    }
+    loadingAttendance={
+      loadingAttendance
+    }
+    canRecordAttendance={
+      canRecordAttendance
+    }
+    onMeetingDateChange={
+      setMeetingDate
+    }
+    onSearchChange={
+      setAttendanceSearch
+    }
+    onClearAttendance={
+      clearMeetingAttendance
+    }
+    onToggleAttendance={
+      toggleAttendance
+    }
+    onToggleFamily={
+      markWholeFamily
+    }
+  />
+)}
 
       {activeTab === "summary" && (
   <AttendanceSummaryView

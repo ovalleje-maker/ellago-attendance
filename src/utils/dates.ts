@@ -31,19 +31,33 @@ export function getPreviousSundayDates(
     return [];
   }
 
-  const date = new Date(`${endDate}T12:00:00Z`);
+  const selectedDate =
+    new Date(`${endDate}T12:00:00Z`);
+
+  const dayOfWeek =
+    selectedDate.getUTCDay();
+
+  selectedDate.setUTCDate(
+    selectedDate.getUTCDate() - dayOfWeek,
+  );
 
   const dates: string[] = [];
 
-  for (let index = 0; index < numberOfWeeks; index++) {
-    const currentDate = new Date(date);
+  for (
+    let index = 0;
+    index < numberOfWeeks;
+    index++
+  ) {
+    const sunday =
+      new Date(selectedDate);
 
-    currentDate.setUTCDate(
-      date.getUTCDate() - index * 7,
+    sunday.setUTCDate(
+      selectedDate.getUTCDate() -
+        index * 7,
     );
 
     dates.push(
-      currentDate.toISOString().slice(0, 10),
+      sunday.toISOString().slice(0, 10),
     );
   }
 
