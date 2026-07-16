@@ -63,3 +63,34 @@ export function getPreviousSundayDates(
 
   return dates;
 }
+
+export function getPreviousOrSameSunday(
+  dateValue: string,
+): string {
+  if (!dateValue) return "";
+
+  const date = new Date(
+    `${dateValue}T12:00:00Z`,
+  );
+
+  const dayOfWeek = date.getUTCDay();
+
+  date.setUTCDate(
+    date.getUTCDate() - dayOfWeek,
+  );
+
+  return date.toISOString().slice(0, 10);
+}
+
+export function isSunday(
+  dateValue: string,
+): boolean {
+  if (!dateValue) return false;
+
+  const date = new Date(
+    `${dateValue}T12:00:00Z`,
+  );
+
+  return date.getUTCDay() === 0;
+}
+
