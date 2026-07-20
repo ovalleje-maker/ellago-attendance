@@ -48,22 +48,16 @@ export async function getAttendanceHistory({
     };
   }
 
-  const oldestDate =
-    requestedDates[requestedDates.length - 1];
-
-  const newestDate = requestedDates[0];
-
   const {
-    data: meetingsData,
-    error: meetingsError,
-  } = await supabase
-    .from("meetings")
-    .select("id, meeting_date")
-    .gte("meeting_date", oldestDate)
-    .lte("meeting_date", newestDate)
-    .order("meeting_date", {
-      ascending: false,
-    });
+  data: meetingsData,
+  error: meetingsError,
+} = await supabase
+  .from("meetings")
+  .select("id, meeting_date")
+  .in("meeting_date", requestedDates)
+  .order("meeting_date", {
+    ascending: false,
+  });
 
   if (meetingsError) {
     throw new Error(meetingsError.message);
@@ -95,6 +89,9 @@ export async function getAttendanceHistory({
     (member) => member.id,
   );
 
+console.log("Miembros visibles para historial:", memberIds);
+console.log("Reuniones visibles:", meetingIds);
+
   const {
     data: attendanceData,
     error: attendanceError,
@@ -110,6 +107,8 @@ export async function getAttendanceHistory({
     .in("meeting_id", meetingIds)
     .in("member_id", memberIds)
     .eq("present", true);
+
+    console.log("Asistencia histórica recibida:", attendanceData);
 
   if (attendanceError) {
     throw new Error(attendanceError.message);

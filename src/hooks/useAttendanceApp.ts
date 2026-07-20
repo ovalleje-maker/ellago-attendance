@@ -24,9 +24,19 @@ import {
 
 import {
   createMember,
+  deactivateMember as deactivateMemberRecord,
   getActiveMembers,
-  removeMember,
+  getInactiveMembers,
+  reactivateMember as reactivateMemberRecord,
+  updateMember,
 } from "@/services/membersService";
+
+import {
+  getMemberAttendanceHistory,
+  getMemberAttendanceSummary,
+  type MemberAttendanceHistoryItem,
+  type MemberAttendanceSummary,
+} from "@/services/memberProfileService";
 
 import {
   getOrCreateMeeting,
@@ -81,6 +91,11 @@ export function useAttendanceApp() {
   const [members, setMembers] =
     useState<Member[]>([]);
 
+    const [
+  inactiveMembers,
+  setInactiveMembers,
+] = useState<Member[]>([]);
+
   const [
     presentMemberIds,
     setPresentMemberIds,
@@ -103,6 +118,11 @@ export function useAttendanceApp() {
 
   const [memberSearch, setMemberSearch] =
     useState("");
+
+    const [
+  inactiveMemberSearch,
+  setInactiveMemberSearch,
+] = useState("");
 
   /*
    * FORMULARIO DE MIEMBROS
@@ -136,6 +156,11 @@ export function useAttendanceApp() {
   ] = useState(true);
 
   const [
+  loadingInactiveMembers,
+  setLoadingInactiveMembers,
+] = useState(true);
+
+  const [
     loadingAttendance,
     setLoadingAttendance,
   ] = useState(true);
@@ -146,12 +171,59 @@ export function useAttendanceApp() {
   ] = useState(false);
 
   const [
+  editingMember,
+  setEditingMember,
+] = useState<Member | null>(null);
+
+const [
+  selectedMember,
+  setSelectedMember,
+] = useState<Member | null>(null);
+
+const [
+  memberAttendanceSummary,
+  setMemberAttendanceSummary,
+] =
+  useState<MemberAttendanceSummary>({
+    totalMeetings: 0,
+    attendanceCount: 0,
+    attendancePercentage: 0,
+    absenceCount: 0,
+  });
+
+const [
+  loadingMemberAttendanceSummary,
+  setLoadingMemberAttendanceSummary,
+] = useState(false);
+
+const [
+  memberAttendanceHistory,
+  setMemberAttendanceHistory,
+] = useState<
+  MemberAttendanceHistoryItem[]
+>([]);
+
+const [
+  loadingMemberAttendanceHistory,
+  setLoadingMemberAttendanceHistory,
+] = useState(false);
+
+const [
+  savingMemberEdit,
+  setSavingMemberEdit,
+] = useState(false);
+
+const [
+  reactivatingMemberId,
+  setReactivatingMemberId,
+] = useState<string | null>(null);
+
+  const [
     changingAttendance,
     setChangingAttendance,
   ] = useState<string | null>(null);
 
-  const [
-    errorMessage,
+   const [    errorMessage,
     setErrorMessage,
   ] = useState("");
 
@@ -200,6 +272,34 @@ export function useAttendanceApp() {
         setLoadingMembers(false);
       }
     }, []);
+
+    const loadInactiveMembers =
+  useCallback(async () => {
+    setLoadingInactiveMembers(true);
+    setErrorMessage("");
+
+    try {
+      const loadedInactiveMembers =
+        await getInactiveMembers();
+
+      setInactiveMembers(
+        loadedInactiveMembers,
+      );
+    } catch (error) {
+      console.error(
+        "Error cargando miembros inactivos:",
+        error,
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? `No fue posible cargar los miembros inactivos: ${error.message}`
+          : "No fue posible cargar los miembros inactivos.",
+      );
+    } finally {
+      setLoadingInactiveMembers(false);
+    }
+  }, []);
 
   /*
    * CARGAR REUNIÓN Y ASISTENCIA
@@ -262,6 +362,10 @@ export function useAttendanceApp() {
   }, [loadMembers]);
 
   useEffect(() => {
+  loadInactiveMembers();
+}, [loadInactiveMembers]);
+
+  useEffect(() => {
     loadMeetingAndAttendance(
       meetingDate,
     );
@@ -269,6 +373,15 @@ export function useAttendanceApp() {
     meetingDate,
     loadMeetingAndAttendance,
   ]);
+
+  useEffect(() => {
+  if (
+    activeTab !== "members" &&
+    selectedMember
+  ) {
+    setSelectedMember(null);
+  }
+}, [activeTab, selectedMember]);
 
   /*
    * FILTRO PARA LA PANTALLA DE ASISTENCIA
@@ -327,6 +440,37 @@ export function useAttendanceApp() {
       members,
       memberSearch,
     ]);
+
+    /*
+ * FILTRO PARA MIEMBROS INACTIVOS
+ */
+
+const filteredInactiveMembers =
+  useMemo(() => {
+    const search =
+      inactiveMemberSearch
+        .trim()
+        .toLowerCase();
+
+    return inactiveMembers.filter(
+      (member) => {
+        const searchableText = [
+          member.full_name,
+          member.family_name ?? "",
+          member.organization,
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return searchableText.includes(
+          search,
+        );
+      },
+    );
+  }, [
+    inactiveMembers,
+    inactiveMemberSearch,
+  ]);
 
   /*
    * PRESENTES Y AUSENTES
@@ -491,67 +635,370 @@ export function useAttendanceApp() {
    * ELIMINAR MIEMBRO
    */
 
-  async function deleteMember(
-    member: Member,
-  ) {
-    if (!canManageMembers) {
-      setErrorMessage(
-        "Tu cuenta no tiene permiso para eliminar miembros.",
-      );
-
-      return;
-    }
-
-    const confirmed =
-      window.confirm(
-        `¿Estás seguro de que deseas eliminar a ${member.full_name}?`,
-      );
-
-    if (!confirmed) return;
-
-    setErrorMessage("");
-
-    try {
-      await removeMember(member.id);
-
-      setMembers(
-        (currentMembers) =>
-          currentMembers.filter(
-            (currentMember) =>
-              currentMember.id !==
-              member.id,
-          ),
-      );
-
-      setPresentMemberIds(
-        (currentIds) => {
-          const updatedIds =
-            new Set(currentIds);
-
-          updatedIds.delete(
-            member.id,
-          );
-
-          return updatedIds;
-        },
-      );
-    } catch (error) {
-      console.error(
-        "Error eliminando miembro:",
-        error,
-      );
-
-      setErrorMessage(
-        error instanceof Error
-          ? `No fue posible eliminar el miembro: ${error.message}`
-          : "No fue posible eliminar el miembro.",
-      );
-    }
-  }
-
-  /*
+   /*
    * MARCAR O DESMARCAR UN MIEMBRO
    */
+
+async function loadMemberAttendanceSummary(
+  memberId: string,
+) {
+  try {
+    setLoadingMemberAttendanceSummary(
+      true,
+    );
+
+    const summary =
+      await getMemberAttendanceSummary(
+        memberId,
+      );
+
+    setMemberAttendanceSummary(
+      summary,
+    );
+  } catch (error) {
+    console.error(
+      "Error al cargar el resumen de asistencia del miembro:",
+      error,
+    );
+
+    setMemberAttendanceSummary({
+      totalMeetings: 0,
+      attendanceCount: 0,
+      attendancePercentage: 0,
+      absenceCount: 0,
+    });
+
+    window.alert(
+      "No se pudo cargar el resumen de asistencia del miembro.",
+    );
+  } finally {
+    setLoadingMemberAttendanceSummary(
+      false,
+    );
+  }
+}
+
+async function loadMemberAttendanceHistory(
+  memberId: string,
+) {
+  try {
+    setLoadingMemberAttendanceHistory(
+      true,
+    );
+
+    const history =
+      await getMemberAttendanceHistory(
+        memberId,
+      );
+
+    setMemberAttendanceHistory(
+      history,
+    );
+  } catch (error) {
+    console.error(
+      "Error al cargar el historial de asistencia del miembro:",
+      error,
+    );
+
+    setMemberAttendanceHistory([]);
+
+    window.alert(
+      "No se pudo cargar el historial de asistencia del miembro.",
+    );
+  } finally {
+    setLoadingMemberAttendanceHistory(
+      false,
+    );
+  }
+}
+
+async function openMemberProfile(
+  member: Member,
+) {
+  setSelectedMember(member);
+
+  setMemberAttendanceSummary({
+    totalMeetings: 0,
+    attendanceCount: 0,
+    attendancePercentage: 0,
+    absenceCount: 0,
+  });
+
+  setMemberAttendanceHistory([]);
+
+  await Promise.all([
+    loadMemberAttendanceSummary(
+      member.id,
+    ),
+    loadMemberAttendanceHistory(
+      member.id,
+    ),
+  ]);
+}
+
+function closeMemberProfile() {
+  setSelectedMember(null);
+
+  setMemberAttendanceSummary({
+    totalMeetings: 0,
+    attendanceCount: 0,
+    attendancePercentage: 0,
+    absenceCount: 0,
+  });
+
+  setMemberAttendanceHistory([]);
+
+  setLoadingMemberAttendanceSummary(
+    false,
+  );
+
+  setLoadingMemberAttendanceHistory(
+    false,
+  );
+}
+
+  function startEditMember(
+  member: Member,
+) {
+  if (!canManageMembers) {
+    setErrorMessage(
+      "Tu cuenta no tiene permiso para editar miembros.",
+    );
+
+    return;
+  }
+
+  setErrorMessage("");
+  setEditingMember(member);
+}
+
+function cancelEditMember() {
+  if (savingMemberEdit) return;
+
+  setEditingMember(null);
+}
+
+async function saveMemberEdit(values: {
+  fullName: string;
+  familyName: string;
+  organization: Organization;
+  recentConvert: boolean;
+}) {
+  if (!canManageMembers) {
+    setErrorMessage(
+      "Tu cuenta no tiene permiso para editar miembros.",
+    );
+
+    return;
+  }
+
+  if (!editingMember) {
+    setErrorMessage(
+      "No hay un miembro seleccionado para editar.",
+    );
+
+    return;
+  }
+
+  setSavingMemberEdit(true);
+  setErrorMessage("");
+
+  try {
+    const updatedMember =
+      await updateMember(
+        editingMember.id,
+        values,
+      );
+
+    setMembers((currentMembers) =>
+      currentMembers
+        .map((member) =>
+          member.id === updatedMember.id
+            ? updatedMember
+            : member,
+        )
+        .sort((memberA, memberB) =>
+          memberA.full_name.localeCompare(
+            memberB.full_name,
+            "es",
+          ),
+        ),
+    );
+
+    setEditingMember(null);
+  } catch (error) {
+    console.error(
+      "Error actualizando miembro:",
+      error,
+    );
+
+    setErrorMessage(
+      error instanceof Error
+        ? `No fue posible actualizar el miembro: ${error.message}`
+        : "No fue posible actualizar el miembro.",
+    );
+  } finally {
+    setSavingMemberEdit(false);
+  }
+}
+
+async function deactivateMember(
+  member: Member,
+) {
+  if (!canManageMembers) {
+    setErrorMessage(
+      "Tu cuenta no tiene permiso para desactivar miembros.",
+    );
+
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `¿Deseas desactivar a ${member.full_name}? Su historial de asistencia se conservará.`,
+  );
+
+  if (!confirmed) return;
+
+  setErrorMessage("");
+
+  try {
+    await deactivateMemberRecord(
+      member.id,
+    );
+
+    setMembers((currentMembers) =>
+      currentMembers.filter(
+        (currentMember) =>
+          currentMember.id !== member.id,
+      ),
+    );
+
+setInactiveMembers(
+  (currentMembers) =>
+    [
+      ...currentMembers.filter(
+        (currentMember) =>
+          currentMember.id !== member.id,
+      ),
+      {
+        ...member,
+        active: false,
+      },
+    ].sort((memberA, memberB) =>
+      memberA.full_name.localeCompare(
+        memberB.full_name,
+        "es",
+      ),
+    ),
+);
+
+    setPresentMemberIds(
+      (currentIds) => {
+        const updatedIds =
+          new Set(currentIds);
+
+        updatedIds.delete(member.id);
+
+        return updatedIds;
+      },
+    );
+
+    if (
+      editingMember?.id === member.id
+    ) {
+      setEditingMember(null);
+    }
+
+    await reloadHistory();
+  } catch (error) {
+    console.error(
+      "Error desactivando miembro:",
+      error,
+    );
+
+    setErrorMessage(
+      error instanceof Error
+        ? `No fue posible desactivar el miembro: ${error.message}`
+        : "No fue posible desactivar el miembro.",
+    );
+  }
+}
+
+async function reactivateMember(
+  member: Member,
+) {
+  if (!canManageMembers) {
+  window.alert(
+    "No tienes permisos para reactivar miembros.",
+  );
+
+  return;
+}
+
+if (reactivatingMemberId) {
+  return;
+}
+  if (!canManageMembers) {
+    setErrorMessage(
+      "Tu cuenta no tiene permiso para reactivar miembros.",
+    );
+
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `¿Deseas reactivar a ${member.full_name}? Su historial de asistencia se conservará.`,
+  );
+
+  if (!confirmed) return;
+
+  setReactivatingMemberId(member.id);
+  setErrorMessage("");
+
+  try {
+    await reactivateMemberRecord(
+      member.id,
+    );
+
+    setInactiveMembers(
+      (currentMembers) =>
+        currentMembers.filter(
+          (currentMember) =>
+            currentMember.id !== member.id,
+        ),
+    );
+
+    setMembers((currentMembers) =>
+      [
+        ...currentMembers,
+        {
+          ...member,
+          active: true,
+        },
+      ].sort((memberA, memberB) =>
+        memberA.full_name.localeCompare(
+          memberB.full_name,
+          "es",
+        ),
+      ),
+    );
+
+    await reloadHistory();
+  } catch (error) {
+    console.error(
+      "Error reactivando miembro:",
+      error,
+    );
+
+    setErrorMessage(
+      error instanceof Error
+        ? `No fue posible reactivar el miembro: ${error.message}`
+        : "No fue posible reactivar el miembro.",
+    );
+  } finally {
+    setReactivatingMemberId(null);
+  }
+}
 
   async function toggleAttendance(
     member: Member,
@@ -835,11 +1282,12 @@ export function useAttendanceApp() {
    * ESTADO GLOBAL DE CARGA
    */
 
-  const loading =
-    loadingMembers ||
-    loadingAttendance ||
-    loadingProfile ||
-    loadingHistory;
+const loading =
+  loadingMembers ||
+  loadingInactiveMembers ||
+  loadingAttendance ||
+  loadingProfile ||
+  loadingHistory;
 
   /*
    * DATOS Y FUNCIONES DISPONIBLES
@@ -853,7 +1301,15 @@ export function useAttendanceApp() {
     setActiveTab,
 
     members,
+    inactiveMembers,
     presentMemberIds,
+    selectedMember,
+    openMemberProfile,
+    closeMemberProfile,
+    memberAttendanceSummary,
+    loadingMemberAttendanceSummary,
+    memberAttendanceHistory,
+    loadingMemberAttendanceHistory,
 
     meetingDate,
     setMeetingDate,
@@ -863,6 +1319,9 @@ export function useAttendanceApp() {
 
     memberSearch,
     setMemberSearch,
+
+    inactiveMemberSearch,
+    setInactiveMemberSearch,
 
     fullName,
     setFullName,
@@ -878,8 +1337,12 @@ export function useAttendanceApp() {
 
     loading,
     loadingMembers,
+    loadingInactiveMembers,
     loadingAttendance,
     savingMember,
+    editingMember,
+    savingMemberEdit,
+    reactivatingMemberId,
     changingAttendance,
 
     profileError,
@@ -891,6 +1354,7 @@ export function useAttendanceApp() {
 
     filteredAttendanceMembers,
     filteredDirectoryMembers,
+    filteredInactiveMembers,
 
     presentMembers,
     absentMembers,
@@ -901,12 +1365,18 @@ export function useAttendanceApp() {
     memberHistories,
 
     addMember,
-    deleteMember,
+    startEditMember,
+    cancelEditMember,
+    saveMemberEdit,
+    deactivateMember,
+    reactivateMember,
     toggleAttendance,
     markWholeFamily,
     clearMeetingAttendance,
 
     reloadMembers: loadMembers,
+    reloadInactiveMembers:
+  loadInactiveMembers,
     reloadMeetingAndAttendance:
       loadMeetingAndAttendance,
     reloadHistory,

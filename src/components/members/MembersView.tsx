@@ -4,6 +4,7 @@ import type {
 
 import AddMemberForm from "@/components/members/AddMemberForm";
 import MembersDirectory from "@/components/members/MembersDirectory";
+import EditMemberModal from "@/components/members/EditMemberModal";
 
 import type {
   Member,
@@ -24,12 +25,17 @@ type MembersViewProps = {
   savingMember: boolean;
   canManageMembers: boolean;
 
+  editingMember: Member | null;
+  savingMemberEdit: boolean;
+
   onSearchChange: (value: string) => void;
   onFullNameChange: (value: string) => void;
   onFamilyNameChange: (value: string) => void;
+
   onOrganizationChange: (
     value: Organization,
   ) => void;
+
   onRecentConvertChange: (
     value: boolean,
   ) => void;
@@ -38,7 +44,24 @@ type MembersViewProps = {
     event: FormEvent<HTMLFormElement>,
   ) => void;
 
-  onDeleteMember: (member: Member) => void;
+  onViewMember: (member: Member) => void;
+
+  onStartEditMember: (
+    member: Member,
+  ) => void;
+
+  onCancelEditMember: () => void;
+
+  onSaveMemberEdit: (values: {
+    fullName: string;
+    familyName: string;
+    organization: Organization;
+    recentConvert: boolean;
+  }) => void;
+
+  onDeactivateMember: (
+    member: Member,
+  ) => void;
 };
 
 export default function MembersView({
@@ -52,13 +75,19 @@ export default function MembersView({
   loadingMembers,
   savingMember,
   canManageMembers,
+  editingMember,
+  savingMemberEdit,
+  onViewMember,
   onSearchChange,
   onFullNameChange,
   onFamilyNameChange,
   onOrganizationChange,
   onRecentConvertChange,
   onAddMember,
-  onDeleteMember,
+  onStartEditMember,
+  onCancelEditMember,
+  onSaveMemberEdit,
+  onDeactivateMember,
 }: MembersViewProps) {
   return (
     <section>
@@ -90,22 +119,27 @@ export default function MembersView({
           canManageMembers ? "mt-4" : ""
         }
       >
-        <MembersDirectory
-          members={members}
-          filteredMembers={
-            filteredMembers
-          }
-          memberSearch={memberSearch}
-          loadingMembers={loadingMembers}
-          canManageMembers={
-            canManageMembers
-          }
-          onSearchChange={onSearchChange}
-          onDeleteMember={
-            onDeleteMember
-          }
-        />
+       <MembersDirectory
+  members={members}
+  filteredMembers={filteredMembers}
+  memberSearch={memberSearch}
+  loadingMembers={loadingMembers}
+  canManageMembers={canManageMembers}
+  onSearchChange={onSearchChange}
+  onViewMember={onViewMember}
+  onEditMember={onStartEditMember}
+  onDeactivateMember={onDeactivateMember}
+/>
       </div>
+      {editingMember && (
+  <EditMemberModal
+    key={editingMember.id}
+    member={editingMember}
+    saving={savingMemberEdit}
+    onClose={onCancelEditMember}
+    onSave={onSaveMemberEdit}
+  />
+)}
     </section>
   );
 }

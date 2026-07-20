@@ -5,6 +5,8 @@ import BishopDashboard from "@/components/dashboard/BishopDashboard";
 import AppHeader from "@/components/layout/AppHeader";
 import AppNavigation from "@/components/layout/AppNavigation";
 import MembersView from "@/components/members/MembersView";
+import InactiveMembersView from "@/components/members/InactiveMembersView";
+import MemberProfileView from "@/components/members/MemberProfileView";
 import AttendanceSummaryView from "@/components/summary/AttendanceSummaryView";
 import ErrorAlert from "@/components/ui/ErrorAlert";
 
@@ -133,7 +135,8 @@ export default function Home() {
           />
         )}
 
-        {app.activeTab === "members" && (
+        {app.activeTab === "members" &&
+        !app.selectedMember && (
           <MembersView
             members={app.members}
             filteredMembers={
@@ -161,6 +164,12 @@ export default function Home() {
             canManageMembers={
               app.canManageMembers
             }
+            editingMember={app.editingMember}
+            savingMemberEdit={app.savingMemberEdit}
+            onViewMember={app.openMemberProfile}
+            onStartEditMember={app.startEditMember}
+            onCancelEditMember={app.cancelEditMember}
+            onSaveMemberEdit={app.saveMemberEdit}
             onSearchChange={
               app.setMemberSearch
             }
@@ -179,11 +188,79 @@ export default function Home() {
             onAddMember={
               app.addMember
             }
-            onDeleteMember={
-              app.deleteMember
+            onDeactivateMember={
+              app.deactivateMember
             }
           />
         )}
+
+        {app.activeTab === "members" &&
+  app.selectedMember && (
+<MemberProfileView
+  member={
+    app.selectedMember
+  }
+totalMeetings={
+  app.memberAttendanceSummary
+    .totalMeetings
+}
+attendanceCount={
+  app.memberAttendanceSummary
+    .attendanceCount
+}
+absenceCount={
+  app.memberAttendanceSummary
+    .absenceCount
+}
+attendancePercentage={
+  app.memberAttendanceSummary
+    .attendancePercentage
+}
+loadingAttendanceSummary={
+  app.loadingMemberAttendanceSummary
+}
+attendanceHistory={
+  app.memberAttendanceHistory
+}
+loadingAttendanceHistory={
+  app.loadingMemberAttendanceHistory
+}
+  onBack={
+    app.closeMemberProfile
+  }
+/>
+)}
+
+{app.activeTab ===
+  "inactive-members" && (
+  <InactiveMembersView
+    members={
+      app.inactiveMembers
+    }
+    filteredMembers={
+      app.filteredInactiveMembers
+    }
+    search={
+      app.inactiveMemberSearch
+    }
+    loading={
+      app.loadingInactiveMembers
+    }
+    canManageMembers={
+      app.canManageMembers
+    }
+    reactivatingMemberId={
+      app.reactivatingMemberId
+    }
+    onSearchChange={
+      app.setInactiveMemberSearch
+    }
+    onReactivateMember={
+      app.reactivateMember
+    }
+  />
+)}
+
       </div>
     </main>
   );
