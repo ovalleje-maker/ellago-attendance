@@ -26,8 +26,11 @@ export default function MemberProfileView({
   loadingAttendanceHistory,
   onBack,
 }: MemberProfileViewProps) {
+  const recentAttendanceHistory =
+    attendanceHistory.slice(0, 10);
+
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-6 p-4">
+    <main className="mx-auto w-full max-w-3xl space-y-6 p-4">
       <button
         type="button"
         onClick={onBack}
@@ -36,7 +39,7 @@ export default function MemberProfileView({
         ← Regresar a miembros
       </button>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-6 py-5">
           <p className="text-sm font-medium text-slate-500">
             Perfil del miembro
@@ -87,110 +90,121 @@ export default function MemberProfileView({
             }
           />
         </div>
-      </div>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-  <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-    <h2 className="text-lg font-bold text-slate-900">
-      Resumen de asistencia
-    </h2>
+      </section>
 
-    <p className="mt-1 text-sm text-slate-500">
-      Participación en reuniones sacramentales
-    </p>
-  </div>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+          <h2 className="text-lg font-bold text-slate-900">
+            Resumen de asistencia
+          </h2>
 
- {loadingAttendanceSummary ? (
-  <div className="p-6">
-    <p className="text-sm font-medium text-slate-500">
-      Cargando resumen de asistencia...
-    </p>
-  </div>
-) : (
-  <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-4">
-    <AttendanceCard
-      label="Reuniones registradas"
-      value={totalMeetings.toString()}
-    />
+          <p className="mt-1 text-sm text-slate-500">
+            Participación en reuniones sacramentales
+          </p>
+        </div>
 
-    <AttendanceCard
-      label="Asistencias"
-      value={attendanceCount.toString()}
-    />
+        {loadingAttendanceSummary ? (
+          <div className="p-6">
+            <p className="text-sm font-medium text-slate-500">
+              Cargando resumen de asistencia...
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-4">
+            <AttendanceCard
+              label="Reuniones registradas"
+              value={totalMeetings.toString()}
+            />
 
-    <AttendanceCard
-     label="Ausencias"
-     value={absenceCount.toString()}
-    />
+            <AttendanceCard
+              label="Asistencias"
+              value={attendanceCount.toString()}
+            />
 
-    <AttendanceCard
-      label="Porcentaje"
-      value={`${attendancePercentage}%`}
-    />
-  </div>
-)}
+            <AttendanceCard
+              label="Ausencias"
+              value={absenceCount.toString()}
+            />
 
-<section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-  <div className="border-b border-slate-200 px-6 py-4">
-    <h2 className="text-lg font-semibold text-slate-900">
-      Historial de asistencia
-    </h2>
+            <AttendanceCard
+              label="Porcentaje"
+              value={`${attendancePercentage}%`}
+            />
+          </div>
+        )}
+      </section>
 
-    <p className="mt-1 text-sm text-slate-500">
-  Registro completo de asistencia a las reuniones sacramentales.
-</p>
-  </div>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Historial de asistencia
+          </h2>
 
-  {loadingAttendanceHistory ? (
-    <div className="px-6 py-8">
-      <p className="text-sm font-medium text-slate-500">
-        Cargando historial de asistencia...
-      </p>
-    </div>
-  ) : attendanceHistory.length === 0 ? (
-    <div className="px-6 py-8">
-      <p className="text-sm text-slate-500">
-  Todavía no existen reuniones registradas.
-</p>
-    </div>
-  ) : (
-    <div className="divide-y divide-slate-200">
-      {attendanceHistory.map(
-        (historyItem) => (
-          <div
-            key={historyItem.meetingId}
-            className="flex items-center justify-between px-6 py-4"
-          >
-            <div>
-              <p className="font-medium text-slate-900">
-                {formatAttendanceDate(
-                  historyItem.meetingDate,
-                )}
-              </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Registro completo de asistencia a las reuniones sacramentales.
+          </p>
+        </div>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Reunión sacramental
-              </p>
+        {loadingAttendanceHistory ? (
+          <div className="px-6 py-8">
+            <p className="text-sm font-medium text-slate-500">
+              Cargando historial de asistencia...
+            </p>
+          </div>
+        ) : attendanceHistory.length === 0 ? (
+          <div className="px-6 py-8">
+            <p className="text-sm text-slate-500">
+              Todavía no existen reuniones registradas.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="divide-y divide-slate-200">
+              {recentAttendanceHistory.map(
+                (historyItem) => (
+                  <div
+                    key={historyItem.meetingId}
+                    className="flex items-center justify-between gap-4 px-6 py-4"
+                  >
+                    <div>
+                      <p className="font-medium capitalize text-slate-900">
+                        {formatAttendanceDate(
+                          historyItem.meetingDate,
+                        )}
+                      </p>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        Reunión sacramental
+                      </p>
+                    </div>
+
+                    {historyItem.status ===
+                    "present" ? (
+                      <span className="shrink-0 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                        Presente
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                        Ausente
+                      </span>
+                    )}
+                  </div>
+                ),
+              )}
             </div>
 
-{historyItem.status ===
-"present" ? (
-  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-    Presente
-  </span>
-) : (
-  <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-    Ausente
-  </span>
-)}
-          </div>
-        ),
-      )}
-    </div>
-  )}
-</section>
-
-</div>
-    </section>
+            {attendanceHistory.length > 10 && (
+              <div className="border-t border-slate-200 px-6 py-4">
+                <p className="text-center text-sm text-slate-500">
+                  Mostrando las 10 reuniones más recientes de{" "}
+                  {attendanceHistory.length} registros.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+    </main>
   );
 }
 
