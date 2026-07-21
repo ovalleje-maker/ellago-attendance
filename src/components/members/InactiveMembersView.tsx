@@ -5,7 +5,7 @@ type InactiveMembersViewProps = {
   filteredMembers: Member[];
   search: string;
   loading: boolean;
-  canManageMembers: boolean;
+  canChangeMemberStatus: boolean;
   reactivatingMemberId: string | null;
   onSearchChange: (value: string) => void;
   onReactivateMember: (
@@ -18,7 +18,7 @@ export default function InactiveMembersView({
   filteredMembers,
   search,
   loading,
-  canManageMembers,
+  canChangeMemberStatus,
   reactivatingMemberId,
   onSearchChange,
   onReactivateMember,
@@ -143,7 +143,7 @@ export default function InactiveMembersView({
                         </div>
                       </div>
 
-                      {canManageMembers && (
+                      {canChangeMemberStatus && (
                         <button
                           type="button"
                           disabled={
@@ -169,7 +169,7 @@ export default function InactiveMembersView({
           </div>
         )}
 
-      {!canManageMembers &&
+      {!canChangeMemberStatus &&
         !loading &&
         members.length > 0 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

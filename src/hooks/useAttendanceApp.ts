@@ -860,7 +860,7 @@ async function saveMemberEdit(values: {
 async function deactivateMember(
   member: Member,
 ) {
-  if (!canManageMembers) {
+  if (!canChangeMemberStatus) {
     setErrorMessage(
       "Tu cuenta no tiene permiso para desactivar miembros.",
     );
@@ -942,7 +942,7 @@ setInactiveMembers(
 async function reactivateMember(
   member: Member,
 ) {
-  if (!canManageMembers) {
+  if (!canChangeMemberStatus) {
   window.alert(
     "No tienes permisos para reactivar miembros.",
   );
@@ -953,7 +953,7 @@ async function reactivateMember(
 if (reactivatingMemberId) {
   return;
 }
-  if (!canManageMembers) {
+  if (!canChangeMemberStatus) {
     setErrorMessage(
       "Tu cuenta no tiene permiso para reactivar miembros.",
     );
@@ -1366,6 +1366,9 @@ const loading =
 
     canManageMembers,
     canRecordAttendance,
+    canChangeMemberStatus,
+    canViewAllMembers,
+    canViewBishopDashboard,
 
     filteredAttendanceMembers,
     filteredDirectoryMembers,

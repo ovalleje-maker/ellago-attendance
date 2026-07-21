@@ -10,6 +10,7 @@ import type {
   Member,
   Organization,
 } from "@/types/member";
+import { canChangeMemberStatus } from "@/utils/permissions";
 
 type MembersViewProps = {
   members: Member[];
@@ -24,6 +25,7 @@ type MembersViewProps = {
   loadingMembers: boolean;
   savingMember: boolean;
   canManageMembers: boolean;
+  canChangeMemberStatus: boolean;
 
   editingMember: Member | null;
   savingMemberEdit: boolean;
@@ -75,6 +77,7 @@ export default function MembersView({
   loadingMembers,
   savingMember,
   canManageMembers,
+  canChangeMemberStatus,
   editingMember,
   savingMemberEdit,
   onViewMember,
@@ -125,6 +128,7 @@ export default function MembersView({
   memberSearch={memberSearch}
   loadingMembers={loadingMembers}
   canManageMembers={canManageMembers}
+  canChangeMemberStatus={canChangeMemberStatus}
   onSearchChange={onSearchChange}
   onViewMember={onViewMember}
   onEditMember={onStartEditMember}

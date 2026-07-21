@@ -164,6 +164,7 @@ export default function Home() {
             canManageMembers={
               app.canManageMembers
             }
+            canChangeMemberStatus={app.canChangeMemberStatus}
             editingMember={app.editingMember}
             savingMemberEdit={app.savingMemberEdit}
             onViewMember={app.openMemberProfile}
@@ -246,9 +247,7 @@ loadingAttendanceHistory={
     loading={
       app.loadingInactiveMembers
     }
-    canManageMembers={
-      app.canManageMembers
-    }
+    canChangeMemberStatus={app.canChangeMemberStatus}
     reactivatingMemberId={
       app.reactivatingMemberId
     }

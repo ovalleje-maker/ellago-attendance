@@ -10,6 +10,7 @@ type MembersDirectoryProps = {
   memberSearch: string;
   loadingMembers: boolean;
   canManageMembers: boolean;
+  canChangeMemberStatus: boolean;
 
   onSearchChange: (
     value: string,
@@ -34,6 +35,7 @@ export default function MembersDirectory({
   memberSearch,
   loadingMembers,
   canManageMembers,
+  canChangeMemberStatus,
   onSearchChange,
   onViewMember,
   onEditMember,
@@ -124,7 +126,7 @@ export default function MembersDirectory({
                       Ver perfil
                     </button>
 
-                    {canManageMembers && (
+                    {canChangeMemberStatus && (
                       <>
                         <button
                           type="button"
