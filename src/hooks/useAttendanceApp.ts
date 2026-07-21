@@ -56,6 +56,15 @@ import {
   getMostRecentSunday,
 } from "@/utils/dates";
 
+import {
+  canChangeMemberStatus as checkCanChangeMemberStatus,
+  canManageAttendance as checkCanManageAttendance,
+  canManageMembers as checkCanManageMembers,
+  canViewAllMembers as checkCanViewAllMembers,
+  canViewBishopDashboard as checkCanViewBishopDashboard,
+  isOrganizationLeader,
+} from "@/utils/permissions";
+
 export function useAttendanceApp() {
   /*
    * PERFIL Y PERMISOS
@@ -67,15 +76,21 @@ export function useAttendanceApp() {
     profileError,
   } = useUserProfile();
 
-  const canManageMembers =
-    profile?.role === "bishop" ||
-    profile?.role === "counselor";
+const canManageMembers = checkCanManageMembers(profile?.role);
 
-  const canRecordAttendance =
-    profile?.role === "bishop" ||
-    profile?.role === "counselor" ||
-    profile?.role === "secretary" ||
-    profile?.role === "leader";
+const canRecordAttendance =
+  checkCanManageAttendance(profile?.role);
+
+const canChangeMemberStatus =
+  checkCanChangeMemberStatus(profile?.role);
+
+const canViewAllMembers =
+  checkCanViewAllMembers(profile?.role);
+
+const canViewBishopDashboard =
+  checkCanViewBishopDashboard(profile?.role);
+
+const isLeader = isOrganizationLeader(profile?.role);
 
   /*
    * NAVEGACIÓN
