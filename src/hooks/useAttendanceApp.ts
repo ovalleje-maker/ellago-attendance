@@ -99,6 +99,18 @@ const isLeader = isOrganizationLeader(profile?.role);
   const [activeTab, setActiveTab] =
     useState<AppTab>("dashboard");
 
+  useEffect(() => {
+  if (
+    activeTab === "dashboard" &&
+    !canViewBishopDashboard
+  ) {
+    setActiveTab("attendance");
+  }
+}, [
+  activeTab,
+  canViewBishopDashboard,
+]);
+
   /*
    * MIEMBROS Y ASISTENCIA
    */

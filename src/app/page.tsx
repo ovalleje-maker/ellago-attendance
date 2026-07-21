@@ -23,6 +23,7 @@ export default function Home() {
 
       <AppNavigation
         activeTab={app.activeTab}
+        canViewBishopDashboard={app.canViewBishopDashboard}
         onTabChange={app.setActiveTab}
       />
 
@@ -45,8 +46,9 @@ export default function Home() {
           </div>
         )}
 
-        {app.activeTab === "dashboard" && (
-          <BishopDashboard
+        {app.activeTab === "dashboard" &&
+        app.canViewBishopDashboard && (
+        <BishopDashboard
             members={app.members}
             presentMemberIds={
               app.presentMemberIds
@@ -62,6 +64,19 @@ export default function Home() {
             }
           />
         )}
+
+        {app.activeTab === "dashboard" &&
+  !app.canViewBishopDashboard && (
+    <section className="rounded-xl border border-amber-200 bg-amber-50 p-6">
+      <h2 className="text-lg font-semibold text-amber-900">
+        Acceso restringido
+      </h2>
+
+      <p className="mt-2 text-sm text-amber-800">
+        Tu cuenta no tiene permiso para ver el panel del obispado.
+      </p>
+    </section>
+  )}
 
         {app.activeTab === "attendance" && (
           <AttendanceView
