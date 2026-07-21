@@ -54,6 +54,7 @@ import type {
 import {
   formatMeetingDate,
   getMostRecentSunday,
+  isSunday,
 } from "@/utils/dates";
 
 import {
@@ -385,6 +386,19 @@ const loadedInactiveMembers =
       setErrorMessage("");
 
       try {
+        const selectedDate =
+  new Date(`${date}T12:00:00`);
+
+if (selectedDate.getDay() !== 0) {
+  setMeetingId(null);
+  setPresentMemberIds(new Set());
+
+  setErrorMessage(
+    "La fecha seleccionada no es domingo. Selecciona un domingo para registrar la asistencia.",
+  );
+
+  return;
+}
         const meeting =
           await getOrCreateMeeting(date);
 

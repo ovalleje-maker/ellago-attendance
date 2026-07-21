@@ -1,10 +1,30 @@
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+
+  const month = String(
+    date.getMonth() + 1,
+  ).padStart(2, "0");
+
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export function getMostRecentSunday(): string {
-  const date = new Date();
-  const day = date.getDay();
+  const today = new Date();
 
-  date.setDate(date.getDate() - day);
+  const sunday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() - today.getDay(),
+    12,
+    0,
+    0,
+  );
 
-  return date.toISOString().slice(0, 10);
+  return formatLocalDate(sunday);
 }
 
 export function formatMeetingDate(
@@ -12,15 +32,19 @@ export function formatMeetingDate(
 ): string {
   if (!dateValue) return "";
 
-  return new Intl.DateTimeFormat("es-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(
-    new Date(`${dateValue}T12:00:00Z`),
+  const date = new Date(
+    `${dateValue}T12:00:00`,
   );
+
+  return new Intl.DateTimeFormat(
+    "es-US",
+    {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    },
+  ).format(date);
 }
 
 export function getPreviousSundayDates(
@@ -31,14 +55,19 @@ export function getPreviousSundayDates(
     return [];
   }
 
-  const selectedDate =
-    new Date(`${endDate}T12:00:00Z`);
+  const selectedDate = new Date(
+    `${endDate}T12:00:00`,
+  );
 
-  const dayOfWeek =
-    selectedDate.getUTCDay();
+  if (
+    Number.isNaN(selectedDate.getTime())
+  ) {
+    return [];
+  }
 
-  selectedDate.setUTCDate(
-    selectedDate.getUTCDate() - dayOfWeek,
+  selectedDate.setDate(
+    selectedDate.getDate() -
+      selectedDate.getDay(),
   );
 
   const dates: string[] = [];
@@ -48,16 +77,17 @@ export function getPreviousSundayDates(
     index < numberOfWeeks;
     index++
   ) {
-    const sunday =
-      new Date(selectedDate);
+    const sunday = new Date(
+      selectedDate,
+    );
 
-    sunday.setUTCDate(
-      selectedDate.getUTCDate() -
+    sunday.setDate(
+      selectedDate.getDate() -
         index * 7,
     );
 
     dates.push(
-      sunday.toISOString().slice(0, 10),
+      formatLocalDate(sunday),
     );
   }
 
@@ -70,16 +100,18 @@ export function getPreviousOrSameSunday(
   if (!dateValue) return "";
 
   const date = new Date(
-    `${dateValue}T12:00:00Z`,
+    `${dateValue}T12:00:00`,
   );
 
-  const dayOfWeek = date.getUTCDay();
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
 
-  date.setUTCDate(
-    date.getUTCDate() - dayOfWeek,
+  date.setDate(
+    date.getDate() - date.getDay(),
   );
 
-  return date.toISOString().slice(0, 10);
+  return formatLocalDate(date);
 }
 
 export function isSunday(
@@ -88,9 +120,12 @@ export function isSunday(
   if (!dateValue) return false;
 
   const date = new Date(
-    `${dateValue}T12:00:00Z`,
+    `${dateValue}T12:00:00`,
   );
 
-  return date.getUTCDay() === 0;
-}
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
 
+  return date.getDay() === 0;
+}

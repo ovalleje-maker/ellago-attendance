@@ -26,19 +26,49 @@ export async function getOrCreateMeeting(
     error: createError,
   } = await supabase
     .from("meetings")
-    .insert({
-      meeting_date: meetingDate,
-      meeting_type: "sacrament",
-    })
+    .upsert(
+      {
+        meeting_date: meetingDate,
+        meeting_type: "sacrament",
+      },
+      {
+        onConflict: "meeting_date",
+        ignoreDuplicates: true,
+      },
+    )
     .select("id, meeting_date")
+    .maybeSingle();
+
+  if (createError) {
+    throw new Error(createError.message);
+  }
+
+  if (createdMeeting) {
+    return createdMeeting as Meeting;
+  }
+
+  /*
+   * Otra solicitud pudo haber creado
+   * la reunión al mismo tiempo.
+   */
+  const {
+    data: meetingAfterInsert,
+    error: finalSearchError,
+  } = await supabase
+    .from("meetings")
+    .select("id, meeting_date")
+    .eq("meeting_date", meetingDate)
     .single();
 
-  if (createError || !createdMeeting) {
+  if (
+    finalSearchError ||
+    !meetingAfterInsert
+  ) {
     throw new Error(
-      createError?.message ||
+      finalSearchError?.message ||
         "Supabase no devolvió la reunión.",
     );
   }
 
-  return createdMeeting as Meeting;
+  return meetingAfterInsert as Meeting;
 }

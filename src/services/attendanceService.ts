@@ -29,12 +29,18 @@ export async function addAttendance(
 ): Promise<void> {
   const { error } = await supabase
     .from("attendance")
-    .insert({
-      meeting_id: meetingId,
-      member_id: memberId,
-      present: true,
-      recorded_by: userId,
-    });
+    .upsert(
+      {
+        meeting_id: meetingId,
+        member_id: memberId,
+        present: true,
+        recorded_by: userId,
+      },
+      {
+        onConflict:
+          "meeting_id,member_id",
+      },
+    );
 
   if (error) {
     throw new Error(error.message);
@@ -58,8 +64,11 @@ export async function addFamilyAttendance(
   );
 
   const { error } = await supabase
-    .from("attendance")
-    .insert(records);
+  .from("attendance")
+  .upsert(records, {
+    onConflict:
+      "meeting_id,member_id",
+  });
 
   if (error) {
     throw new Error(error.message);
