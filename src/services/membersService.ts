@@ -29,16 +29,27 @@ const MEMBER_COLUMNS = `
   created_at
 `;
 
-export async function getActiveMembers(): Promise<
-  Member[]
-> {
-  const { data, error } = await supabase
+export async function getActiveMembers(
+  organization?: string | null,
+): Promise<Member[]> {
+  let query = supabase
     .from("members")
     .select(MEMBER_COLUMNS)
-    .eq("active", true)
-    .order("full_name", {
+    .eq("active", true);
+
+  if (organization) {
+    query = query.eq(
+      "organization",
+      organization,
+    );
+  }
+
+  const { data, error } = await query.order(
+    "full_name",
+    {
       ascending: true,
-    });
+    },
+  );
 
   if (error) {
     throw new Error(error.message);
@@ -47,16 +58,27 @@ export async function getActiveMembers(): Promise<
   return (data ?? []) as Member[];
 }
 
-export async function getInactiveMembers(): Promise<
-  Member[]
-> {
-  const { data, error } = await supabase
+export async function getInactiveMembers(
+  organization?: string | null,
+): Promise<Member[]> {
+  let query = supabase
     .from("members")
     .select(MEMBER_COLUMNS)
-    .eq("active", false)
-    .order("full_name", {
+    .eq("active", false);
+
+  if (organization) {
+    query = query.eq(
+      "organization",
+      organization,
+    );
+  }
+
+  const { data, error } = await query.order(
+    "full_name",
+    {
       ascending: true,
-    });
+    },
+  );
 
   if (error) {
     throw new Error(error.message);

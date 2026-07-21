@@ -274,31 +274,58 @@ const [
    * CARGAR MIEMBROS
    */
 
-  const loadMembers =
-    useCallback(async () => {
-      setLoadingMembers(true);
-      setErrorMessage("");
+ const loadMembers =
+  useCallback(async () => {
+    setLoadingMembers(true);
+    setErrorMessage("");
 
-      try {
-        const loadedMembers =
-          await getActiveMembers();
-
-        setMembers(loadedMembers);
-      } catch (error) {
-        console.error(
-          "Error cargando miembros:",
-          error,
-        );
+    try {
+      if (
+        !canViewAllMembers &&
+        !profile?.organization
+      ) {
+        setMembers([]);
 
         setErrorMessage(
-          error instanceof Error
-            ? `No fue posible cargar los miembros: ${error.message}`
-            : "No fue posible cargar los miembros.",
+          "Tu perfil no tiene una organización asignada.",
         );
-      } finally {
-        setLoadingMembers(false);
+
+        return;
       }
-    }, []);
+
+      const organizationFilter =
+        canViewAllMembers
+          ? undefined
+          : profile?.organization;
+
+      const loadedMembers =
+  await getActiveMembers(
+    organizationFilter,
+  );
+
+setMembers(
+  loadedMembers,
+);
+
+      setMembers(loadedMembers);
+    } catch (error) {
+      console.error(
+        "Error cargando miembros:",
+        error,
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? `No fue posible cargar los miembros: ${error.message}`
+          : "No fue posible cargar los miembros.",
+      );
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, [
+    canViewAllMembers,
+    profile?.organization,
+  ]);
 
     const loadInactiveMembers =
   useCallback(async () => {
@@ -306,8 +333,23 @@ const [
     setErrorMessage("");
 
     try {
-      const loadedInactiveMembers =
-        await getInactiveMembers();
+     if (
+  !canViewAllMembers &&
+  !profile?.organization
+) {
+  setInactiveMembers([]);
+  return;
+}
+
+const organizationFilter =
+  canViewAllMembers
+    ? undefined
+    : profile?.organization;
+
+const loadedInactiveMembers =
+  await getInactiveMembers(
+    organizationFilter,
+  );
 
       setInactiveMembers(
         loadedInactiveMembers,
@@ -326,7 +368,10 @@ const [
     } finally {
       setLoadingInactiveMembers(false);
     }
-  }, []);
+  }, [
+  canViewAllMembers,
+  profile?.organization,
+]);
 
   /*
    * CARGAR REUNIÓN Y ASISTENCIA
