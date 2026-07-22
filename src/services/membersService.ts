@@ -7,6 +7,11 @@ import type {
 
 export type NewMemberInput = {
   fullName: string;
+
+  first_name?: string | null;
+  last_name?: string | null;
+  married_last_name?: string | null;
+
   familyName: string;
   organization: Organization;
   recentConvert: boolean;
@@ -14,6 +19,11 @@ export type NewMemberInput = {
 
 export type UpdateMemberInput = {
   fullName: string;
+
+  first_name?: string | null;
+  last_name?: string | null;
+  married_last_name?: string | null;
+
   familyName: string;
   organization: Organization;
   recentConvert: boolean;
@@ -22,6 +32,9 @@ export type UpdateMemberInput = {
 const MEMBER_COLUMNS = `
   id,
   full_name,
+  first_name,
+  last_name,
+  married_last_name,
   family_name,
   organization,
   recent_convert,
@@ -92,6 +105,14 @@ export async function createMember(
 ): Promise<Member> {
   const cleanName = input.fullName.trim();
   const cleanFamily = input.familyName.trim();
+  const cleanFirstName =
+  input.first_name?.trim() || null;
+
+  const cleanLastName =
+  input.last_name?.trim() || null;
+
+  const cleanMarriedLastName =
+  input.married_last_name?.trim() || null;
 
   if (!cleanName) {
     throw new Error(
@@ -103,6 +124,10 @@ export async function createMember(
     .from("members")
     .insert({
       full_name: cleanName,
+      first_name: cleanFirstName,
+last_name: cleanLastName,
+married_last_name:
+  cleanMarriedLastName,
       family_name: cleanFamily || null,
       organization: input.organization,
       recent_convert: input.recentConvert,
@@ -138,6 +163,9 @@ export async function updateMember(
     .from("members")
     .update({
       full_name: cleanName,
+      first_name: input.first_name ?? null,
+      last_name: input.last_name ?? null,
+      married_last_name: input.married_last_name ?? null,
       family_name: cleanFamily || null,
       organization: input.organization,
       recent_convert: input.recentConvert,

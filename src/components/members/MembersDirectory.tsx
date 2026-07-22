@@ -3,6 +3,9 @@
 import type {
   Member,
 } from "@/types/member";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type MembersDirectoryProps = {
   members: Member[];
@@ -92,7 +95,7 @@ export default function MembersDirectory({
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-gray-900">
-                      {member.full_name}
+                      {buildDisplayName(member)}
                     </p>
 
                     <div className="mt-1 space-y-1 text-sm text-gray-600">

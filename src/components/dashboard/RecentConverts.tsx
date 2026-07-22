@@ -1,5 +1,8 @@
 import type { Member } from "@/types/member";
 import EmptyMessage from "@/components/ui/EmptyMessage";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type RecentConvertsProps = {
   members: Member[];
@@ -37,7 +40,7 @@ export default function RecentConverts({
             >
               <div>
                 <h3 className="font-bold">
-                  {member.full_name}
+                  {buildDisplayName(member)}
                 </h3>
 
                 <p className="mt-1 text-sm text-slate-500">

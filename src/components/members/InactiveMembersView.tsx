@@ -1,4 +1,7 @@
 import type { Member } from "@/types/member";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type InactiveMembersViewProps = {
   members: Member[];
@@ -119,7 +122,7 @@ export default function InactiveMembersView({
                       <div>
                         <h3 className="font-bold text-slate-900">
                           {
-                            member.full_name
+                            buildDisplayName(member)
                           }
                         </h3>
 

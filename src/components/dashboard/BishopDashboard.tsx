@@ -20,6 +20,9 @@ import type {
 
 import AttendanceFollowUp from "@/components/dashboard/AttendanceFollowUp";
 import AttendanceHistoryTable from "@/components/dashboard/AttendanceHistoryTable";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type BishopDashboardProps = {
   members: Member[];
@@ -281,10 +284,14 @@ export default function BishopDashboard({
         <div className="mt-4 space-y-3">
           {absentMembers
             .sort((memberA, memberB) =>
-              memberA.full_name.localeCompare(
-                memberB.full_name,
-                "es",
+            buildDisplayName(
+              memberA,
+            ).localeCompare(
+              buildDisplayName(
+                memberB,
               ),
+              "es",
+            )  ,
             )
             .map((member) => (
               <SummaryMember

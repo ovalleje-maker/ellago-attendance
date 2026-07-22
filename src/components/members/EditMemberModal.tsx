@@ -11,7 +11,9 @@ import type {
 } from "@/types/member";
 
 type EditMemberValues = {
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  marriedLastName: string;
   familyName: string;
   organization: Organization;
   recentConvert: boolean;
@@ -33,9 +35,26 @@ export default function EditMemberModal({
   onSave,
 }: EditMemberModalProps) {
   const [
-    fullName,
-    setFullName,
-  ] = useState(member.full_name);
+    firstName,
+    setFirstName,
+  ] = useState(
+    member.first_name ??
+      member.full_name,
+  );
+
+  const [
+    lastName,
+    setLastName,
+  ] = useState(
+    member.last_name ?? "",
+  );
+
+  const [
+    marriedLastName,
+    setMarriedLastName,
+  ] = useState(
+    member.married_last_name ?? "",
+  );
 
   const [
     familyName,
@@ -63,18 +82,35 @@ export default function EditMemberModal({
   ) {
     event.preventDefault();
 
-    const cleanFullName =
-      fullName.trim();
+    const cleanFirstName =
+      firstName.trim().replace(/\s+/g, " ");
+
+    const cleanLastName =
+      lastName.trim().replace(/\s+/g, " ");
+
+    const cleanMarriedLastName =
+      marriedLastName
+        .trim()
+        .replace(/\s+/g, " ");
 
     const cleanFamilyName =
-      familyName.trim();
+      familyName
+        .trim()
+        .replace(/\s+/g, " ");
 
-    if (!cleanFullName) {
+    if (!cleanFirstName) {
+      return;
+    }
+
+    if (!cleanLastName) {
       return;
     }
 
     await onSave({
-      fullName: cleanFullName,
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      marriedLastName:
+        cleanMarriedLastName,
       familyName: cleanFamilyName,
       organization,
       recentConvert,
@@ -99,7 +135,8 @@ export default function EditMemberModal({
             </h2>
 
             <p className="mt-1 text-sm text-gray-600">
-              Actualiza la información del miembro.
+              Actualiza la información del
+              miembro.
             </p>
           </div>
 
@@ -120,18 +157,18 @@ export default function EditMemberModal({
         >
           <div>
             <label
-              htmlFor="edit-full-name"
+              htmlFor="edit-first-name"
               className="mb-1 block text-sm font-medium text-gray-700"
             >
-              Nombre completo
+              Nombre o nombres
             </label>
 
             <input
-              id="edit-full-name"
+              id="edit-first-name"
               type="text"
-              value={fullName}
+              value={firstName}
               onChange={(event) =>
-                setFullName(
+                setFirstName(
                   event.target.value,
                 )
               }
@@ -139,6 +176,57 @@ export default function EditMemberModal({
               required
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100"
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="edit-last-name"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Apellido o apellidos
+            </label>
+
+            <input
+              id="edit-last-name"
+              type="text"
+              value={lastName}
+              onChange={(event) =>
+                setLastName(
+                  event.target.value,
+                )
+              }
+              disabled={saving}
+              required
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="edit-married-last-name"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Apellido de casada
+            </label>
+
+            <input
+              id="edit-married-last-name"
+              type="text"
+              value={marriedLastName}
+              onChange={(event) =>
+                setMarriedLastName(
+                  event.target.value,
+                )
+              }
+              disabled={saving}
+              placeholder="Opcional"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100"
+            />
+
+            <p className="mt-1 text-xs text-gray-500">
+              No escribas la palabra
+              &quot;de&quot;.
+            </p>
           </div>
 
           <div>
@@ -203,8 +291,8 @@ export default function EditMemberModal({
                 Primaria
               </option>
 
-              <option value="Otros">
-                Otros
+              <option value="Otro">
+                Otro
               </option>
             </select>
           </div>
@@ -241,7 +329,8 @@ export default function EditMemberModal({
               type="submit"
               disabled={
                 saving ||
-                !fullName.trim()
+                !firstName.trim() ||
+                !lastName.trim()
               }
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >

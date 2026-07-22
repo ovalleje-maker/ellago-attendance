@@ -9,7 +9,7 @@ import InactiveMembersView from "@/components/members/InactiveMembersView";
 import MemberProfileView from "@/components/members/MemberProfileView";
 import AttendanceSummaryView from "@/components/summary/AttendanceSummaryView";
 import ErrorAlert from "@/components/ui/ErrorAlert";
-
+import AccountView from "@/components/account/AccountView";
 import {
   useAttendanceApp,
 } from "@/hooks/useAttendanceApp";
@@ -160,10 +160,14 @@ export default function Home() {
             memberSearch={
               app.memberSearch
             }
-            fullName={app.fullName}
+            firstName={app.firstName}
+            lastName={app.lastName}
+            marriedLastName={
+              app.marriedLastName
+            }
             familyName={
               app.familyName
-            }
+            }   
             organization={
               app.organization
             }
@@ -189,9 +193,15 @@ export default function Home() {
             onSearchChange={
               app.setMemberSearch
             }
-            onFullNameChange={
-              app.setFullName
+            onFirstNameChange={
+              app.setFirstName
             }
+            onLastNameChange={
+              app.setLastName
+            }
+onMarriedLastNameChange={
+  app.setMarriedLastName
+}
             onFamilyNameChange={
               app.setFamilyName
             }
@@ -272,6 +282,12 @@ loadingAttendanceHistory={
     onReactivateMember={
       app.reactivateMember
     }
+  />
+)}
+
+{app.activeTab === "account" && (
+  <AccountView
+    profile={app.profile}
   />
 )}
 

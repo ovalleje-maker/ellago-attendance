@@ -2,6 +2,9 @@ import type { Member } from "@/types/member";
 import type {
   MemberAttendanceHistoryItem,
 } from "@/services/memberProfileService";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type MemberProfileViewProps = {
   member: Member;
@@ -46,14 +49,33 @@ export default function MemberProfileView({
           </p>
 
           <h1 className="mt-1 text-2xl font-bold text-slate-900">
-            {member.full_name}
+            {buildDisplayName(member)}
           </h1>
         </div>
 
         <div className="grid gap-6 p-6 sm:grid-cols-2">
           <ProfileField
-            label="Nombre completo"
-            value={member.full_name}
+            label="Nombre(s)"
+            value={
+            member.first_name ||
+            "Sin nombre separado"
+            }
+          />
+
+          <ProfileField
+            label="Apellido(s)"
+            value={
+            member.last_name ||
+            "Sin apellido separado"
+            }
+          />
+
+          <ProfileField
+            label="Apellido de casada"
+            value={
+            member.married_last_name ||
+            "No aplica"
+            }
           />
 
           <ProfileField

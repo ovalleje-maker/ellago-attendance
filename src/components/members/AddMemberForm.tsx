@@ -5,17 +5,25 @@ import type {
 } from "@/types/member";
 
 type AddMemberFormProps = {
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  marriedLastName: string;
   familyName: string;
   organization: Organization;
   recentConvert: boolean;
   savingMember: boolean;
 
-  onFullNameChange: (value: string) => void;
+  onFirstNameChange: (value: string) => void;
+  onLastNameChange: (value: string) => void;
+  onMarriedLastNameChange: (
+    value: string,
+  ) => void;
   onFamilyNameChange: (value: string) => void;
+
   onOrganizationChange: (
     value: Organization,
   ) => void;
+
   onRecentConvertChange: (
     value: boolean,
   ) => void;
@@ -26,12 +34,16 @@ type AddMemberFormProps = {
 };
 
 export default function AddMemberForm({
-  fullName,
+  firstName,
+  lastName,
+  marriedLastName,
   familyName,
   organization,
   recentConvert,
   savingMember,
-  onFullNameChange,
+  onFirstNameChange,
+  onLastNameChange,
+  onMarriedLastNameChange,
   onFamilyNameChange,
   onOrganizationChange,
   onRecentConvertChange,
@@ -44,7 +56,8 @@ export default function AddMemberForm({
       </h2>
 
       <p className="mt-1 text-sm text-slate-500">
-        El miembro se guardará en Supabase.
+        Ingresa los nombres y apellidos por
+        separado.
       </p>
 
       <form
@@ -53,19 +66,66 @@ export default function AddMemberForm({
       >
         <label className="block">
           <span className="text-sm font-bold text-slate-700">
-            Nombre completo
+            Nombre o nombres
           </span>
 
           <input
             type="text"
-            value={fullName}
+            value={firstName}
             disabled={savingMember}
+            required
             onChange={(event) =>
-              onFullNameChange(event.target.value)
+              onFirstNameChange(
+                event.target.value,
+              )
             }
-            placeholder="Ej. María López"
+            placeholder="Ej. María Elena"
             className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
           />
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-bold text-slate-700">
+            Apellido o apellidos
+          </span>
+
+          <input
+            type="text"
+            value={lastName}
+            disabled={savingMember}
+            required
+            onChange={(event) =>
+              onLastNameChange(
+                event.target.value,
+              )
+            }
+            placeholder="Ej. Ramírez López"
+            className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-bold text-slate-700">
+            Apellido de casada
+          </span>
+
+          <input
+            type="text"
+            value={marriedLastName}
+            disabled={savingMember}
+            onChange={(event) =>
+              onMarriedLastNameChange(
+                event.target.value,
+              )
+            }
+            placeholder="Ej. Ovalle"
+            className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
+          />
+
+          <span className="mt-1 block text-xs text-slate-500">
+            Opcional. No escribas la palabra
+            &quot;de&quot;.
+          </span>
         </label>
 
         <label className="block">
@@ -82,7 +142,7 @@ export default function AddMemberForm({
                 event.target.value,
               )
             }
-            placeholder="Ej. Familia López"
+            placeholder="Ej. Ovalle Ramírez"
             className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100"
           />
         </label>

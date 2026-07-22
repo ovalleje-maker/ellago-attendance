@@ -1,5 +1,8 @@
 import EmptyMessage from "@/components/ui/EmptyMessage";
 import type { Member } from "@/types/member";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type AttendanceMemberListProps = {
   members: Member[];
@@ -42,7 +45,7 @@ export default function AttendanceMemberList({
           >
             <div>
               <h2 className="font-bold">
-                {member.full_name}
+                {buildDisplayName(member)}
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">

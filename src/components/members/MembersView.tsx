@@ -17,7 +17,9 @@ type MembersViewProps = {
   filteredMembers: Member[];
 
   memberSearch: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  marriedLastName: string;
   familyName: string;
   organization: Organization;
   recentConvert: boolean;
@@ -31,7 +33,11 @@ type MembersViewProps = {
   savingMemberEdit: boolean;
 
   onSearchChange: (value: string) => void;
-  onFullNameChange: (value: string) => void;
+  onFirstNameChange: (value: string) => void;
+  onLastNameChange: (value: string) => void;
+  onMarriedLastNameChange: (
+   value: string,
+  ) => void;
   onFamilyNameChange: (value: string) => void;
 
   onOrganizationChange: (
@@ -55,7 +61,9 @@ type MembersViewProps = {
   onCancelEditMember: () => void;
 
   onSaveMemberEdit: (values: {
-    fullName: string;
+    firstName: string;
+    lastName: string;
+    marriedLastName: string;
     familyName: string;
     organization: Organization;
     recentConvert: boolean;
@@ -70,7 +78,9 @@ export default function MembersView({
   members,
   filteredMembers,
   memberSearch,
-  fullName,
+  firstName,
+  lastName,
+  marriedLastName,
   familyName,
   organization,
   recentConvert,
@@ -82,7 +92,9 @@ export default function MembersView({
   savingMemberEdit,
   onViewMember,
   onSearchChange,
-  onFullNameChange,
+  onFirstNameChange,
+  onLastNameChange,
+  onMarriedLastNameChange,
   onFamilyNameChange,
   onOrganizationChange,
   onRecentConvertChange,
@@ -96,13 +108,21 @@ export default function MembersView({
     <section>
       {canManageMembers && (
         <AddMemberForm
-          fullName={fullName}
+          firstName={firstName}
+          lastName={lastName}
+          marriedLastName={marriedLastName}
           familyName={familyName}
           organization={organization}
           recentConvert={recentConvert}
           savingMember={savingMember}
-          onFullNameChange={
-            onFullNameChange
+          onFirstNameChange={
+            onFirstNameChange
+          }
+          onLastNameChange={
+            onLastNameChange
+          }
+          onMarriedLastNameChange={
+            onMarriedLastNameChange
           }
           onFamilyNameChange={
             onFamilyNameChange

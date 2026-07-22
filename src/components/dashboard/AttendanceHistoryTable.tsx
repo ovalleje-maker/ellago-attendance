@@ -3,6 +3,9 @@ import type {
 } from "@/types/attendance";
 
 import type { Member } from "@/types/member";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type AttendanceHistoryTableProps = {
   members: Member[];
@@ -72,10 +75,14 @@ export default function AttendanceHistoryTable({
           <tbody>
             {[...members]
               .sort((memberA, memberB) =>
-                memberA.full_name.localeCompare(
-                  memberB.full_name,
-                  "es",
+              buildDisplayName(
+                 memberA,
+              ).localeCompare(
+                buildDisplayName(
+                  memberB,
                 ),
+                "es",
+              ),
               )
               .map((member) => {
                 const history =
@@ -88,7 +95,7 @@ export default function AttendanceHistoryTable({
                   >
                     <td className="sticky left-0 bg-white px-3 py-4">
                       <p className="font-semibold">
-                        {member.full_name}
+                        {buildDisplayName(member)}
                       </p>
 
                       <p className="text-xs text-slate-500">

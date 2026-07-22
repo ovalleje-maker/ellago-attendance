@@ -1,4 +1,7 @@
 import type { Member } from "@/types/member";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type SummaryMemberProps = {
   member: Member;
@@ -15,7 +18,7 @@ export default function SummaryMember({
     <article className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
       <div>
         <h3 className="font-bold">
-          {member.full_name}
+          {buildDisplayName(member)}
         </h3>
 
         <p className="text-sm text-slate-500">

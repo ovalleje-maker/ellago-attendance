@@ -9,6 +9,11 @@ export type Organization =
 export type Member = {
   id: string;
   full_name: string;
+
+  first_name: string | null;
+  last_name: string | null;
+  married_last_name: string | null;
+
   family_name: string | null;
   organization: Organization;
   recent_convert: boolean;

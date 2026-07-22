@@ -65,6 +65,39 @@ import {
   canViewBishopDashboard as checkCanViewBishopDashboard,
   isOrganizationLeader,
 } from "@/utils/permissions";
+import {
+  buildDisplayName,
+  buildSortName,
+} from "@/utils/memberNames";
+
+function normalizeSearchText(
+  value: string,
+) {
+  return value
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      "",
+    )
+    .toLowerCase()
+    .trim();
+}
+
+function getMemberSearchText(
+  member: Member,
+) {
+  return normalizeSearchText(
+    [
+      member.first_name ?? "",
+      member.last_name ?? "",
+      member.married_last_name ?? "",
+      buildDisplayName(member),
+      member.full_name,
+      member.family_name ?? "",
+      member.organization,
+    ].join(" "),
+  );
+}
 
 export function useAttendanceApp() {
   /*
@@ -156,11 +189,19 @@ const isLeader = isOrganizationLeader(profile?.role);
    * FORMULARIO DE MIEMBROS
    */
 
-  const [fullName, setFullName] =
-    useState("");
+const [firstName, setFirstName] =
+  useState("");
 
-  const [familyName, setFamilyName] =
-    useState("");
+const [lastName, setLastName] =
+  useState("");
+
+const [
+  marriedLastName,
+  setMarriedLastName,
+] = useState("");
+
+const [familyName, setFamilyName] =
+  useState("");
 
   const [
     organization,
@@ -475,24 +516,41 @@ if (selectedDate.getDay() !== 0) {
 
   const filteredAttendanceMembers =
     useMemo(() => {
-      const search =
-        attendanceSearch
-          .trim()
-          .toLowerCase();
+     const search =
+  normalizeSearchText(
+    attendanceSearch,
+  );
 
-      return members.filter((member) => {
-        const searchableText = [
-          member.full_name,
-          member.family_name ?? "",
-          member.organization,
-        ]
-          .join(" ")
-          .toLowerCase();
+if (!search) {
+  return [...members].sort(
+    (memberA, memberB) =>
+      buildSortName(
+        memberA,
+      ).localeCompare(
+        buildSortName(
+          memberB,
+        ),
+        "es",
+      ),
+  );
+}
 
-        return searchableText.includes(
-          search,
-        );
-      });
+return members
+  .filter((member) =>
+    getMemberSearchText(
+      member,
+    ).includes(search),
+  )
+  .sort((memberA, memberB) =>
+    buildSortName(
+      memberA,
+    ).localeCompare(
+      buildSortName(
+        memberB,
+      ),
+      "es",
+    ),
+  );
     }, [
       members,
       attendanceSearch,
@@ -502,30 +560,40 @@ if (selectedDate.getDay() !== 0) {
    * FILTRO PARA EL DIRECTORIO
    */
 
-  const filteredDirectoryMembers =
-    useMemo(() => {
-      const search =
-        memberSearch
-          .trim()
-          .toLowerCase();
+ const filteredDirectoryMembers =
+  useMemo(() => {
+    const search =
+      normalizeSearchText(
+        memberSearch,
+      );
 
-      return members.filter((member) => {
-        const searchableText = [
-          member.full_name,
-          member.family_name ?? "",
-          member.organization,
-        ]
-          .join(" ")
-          .toLowerCase();
+    const sortedMembers = [
+      ...members,
+    ].sort((memberA, memberB) =>
+      buildSortName(
+        memberA,
+      ).localeCompare(
+        buildSortName(
+          memberB,
+        ),
+        "es",
+      ),
+    );
 
-        return searchableText.includes(
-          search,
-        );
-      });
-    }, [
-      members,
-      memberSearch,
-    ]);
+    if (!search) {
+      return sortedMembers;
+    }
+
+    return sortedMembers.filter(
+      (member) =>
+        getMemberSearchText(
+          member,
+        ).includes(search),
+    );
+  }, [
+    members,
+    memberSearch,
+  ]);
 
     /*
  * FILTRO PARA MIEMBROS INACTIVOS
@@ -534,25 +602,20 @@ if (selectedDate.getDay() !== 0) {
 const filteredInactiveMembers =
   useMemo(() => {
     const search =
-      inactiveMemberSearch
-        .trim()
-        .toLowerCase();
+  normalizeSearchText(
+    inactiveMemberSearch,
+  );
 
-    return inactiveMembers.filter(
-      (member) => {
-        const searchableText = [
-          member.full_name,
-          member.family_name ?? "",
-          member.organization,
-        ]
-          .join(" ")
-          .toLowerCase();
+if (!search) {
+  return inactiveMembers;
+}
 
-        return searchableText.includes(
-          search,
-        );
-      },
-    );
+return inactiveMembers.filter(
+  (member) =>
+    getMemberSearchText(
+      member,
+    ).includes(search),
+);
   }, [
     inactiveMembers,
     inactiveMemberSearch,
@@ -652,31 +715,61 @@ const filteredInactiveMembers =
       return;
     }
 
-    const cleanName =
-      fullName.trim();
+   const cleanFirstName =
+  firstName.trim().replace(/\s+/g, " ");
 
-    const cleanFamily =
-      familyName.trim();
+const cleanLastName =
+  lastName.trim().replace(/\s+/g, " ");
 
-    if (!cleanName) {
-      setErrorMessage(
-        "Escribe el nombre completo del miembro.",
-      );
+const cleanMarriedLastName =
+  marriedLastName
+    .trim()
+    .replace(/\s+/g, " ");
 
-      return;
-    }
+const cleanFamily =
+  familyName.trim().replace(/\s+/g, " ");
+
+if (!cleanFirstName) {
+  setErrorMessage(
+    "Escribe el nombre o nombres del miembro.",
+  );
+
+  return;
+}
+
+if (!cleanLastName) {
+  setErrorMessage(
+    "Escribe el apellido o apellidos del miembro.",
+  );
+
+  return;
+}
+
+const generatedFullName = [
+  cleanFirstName,
+  cleanLastName,
+  cleanMarriedLastName
+    ? `de ${cleanMarriedLastName}`
+    : "",
+]
+  .filter(Boolean)
+  .join(" ");
 
     setSavingMember(true);
     setErrorMessage("");
 
     try {
-      const newMember =
-        await createMember({
-          fullName: cleanName,
-          familyName: cleanFamily,
-          organization,
-          recentConvert,
-        });
+     const newMember =
+  await createMember({
+    fullName: generatedFullName,
+    first_name: cleanFirstName,
+    last_name: cleanLastName,
+    married_last_name:
+      cleanMarriedLastName || null,
+    familyName: cleanFamily,
+    organization,
+    recentConvert,
+  });
 
       setMembers(
         (currentMembers) =>
@@ -688,15 +781,21 @@ const filteredInactiveMembers =
               memberA,
               memberB,
             ) =>
-              memberA.full_name.localeCompare(
-                memberB.full_name,
+              buildDisplayName(
+                memberA,
+              ).localeCompare(
+                buildDisplayName(
+                  memberB,
+                ),
                 "es",
               ),
           ),
       );
 
-      setFullName("");
-      setFamilyName("");
+setFirstName("");
+setLastName("");
+setMarriedLastName("");
+setFamilyName("");
       setOrganization(
         "Cuórum de Élderes",
       );
@@ -865,7 +964,9 @@ function cancelEditMember() {
 }
 
 async function saveMemberEdit(values: {
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  marriedLastName: string;
   familyName: string;
   organization: Organization;
   recentConvert: boolean;
@@ -886,6 +987,52 @@ async function saveMemberEdit(values: {
     return;
   }
 
+  const cleanFirstName =
+    values.firstName
+      .trim()
+      .replace(/\s+/g, " ");
+
+  const cleanLastName =
+    values.lastName
+      .trim()
+      .replace(/\s+/g, " ");
+
+  const cleanMarriedLastName =
+    values.marriedLastName
+      .trim()
+      .replace(/\s+/g, " ");
+
+  const cleanFamilyName =
+    values.familyName
+      .trim()
+      .replace(/\s+/g, " ");
+
+  if (!cleanFirstName) {
+    setErrorMessage(
+      "Escribe el nombre o nombres del miembro.",
+    );
+
+    return;
+  }
+
+  if (!cleanLastName) {
+    setErrorMessage(
+      "Escribe el apellido o apellidos del miembro.",
+    );
+
+    return;
+  }
+
+  const generatedFullName = [
+    cleanFirstName,
+    cleanLastName,
+    cleanMarriedLastName
+      ? `de ${cleanMarriedLastName}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   setSavingMemberEdit(true);
   setErrorMessage("");
 
@@ -893,7 +1040,18 @@ async function saveMemberEdit(values: {
     const updatedMember =
       await updateMember(
         editingMember.id,
-        values,
+        {
+          fullName: generatedFullName,
+          first_name: cleanFirstName,
+          last_name: cleanLastName,
+          married_last_name:
+            cleanMarriedLastName || null,
+          familyName: cleanFamilyName,
+          organization:
+            values.organization,
+          recentConvert:
+            values.recentConvert,
+        },
       );
 
     setMembers((currentMembers) =>
@@ -904,8 +1062,12 @@ async function saveMemberEdit(values: {
             : member,
         )
         .sort((memberA, memberB) =>
-          memberA.full_name.localeCompare(
-            memberB.full_name,
+          buildDisplayName(
+            memberA,
+          ).localeCompare(
+            buildDisplayName(
+              memberB,
+            ),
             "es",
           ),
         ),
@@ -940,7 +1102,7 @@ async function deactivateMember(
   }
 
   const confirmed = window.confirm(
-    `¿Deseas desactivar a ${member.full_name}? Su historial de asistencia se conservará.`,
+    `¿Deseas desactivar a ${buildDisplayName(member)}? Su historial de asistencia se conservará.`
   );
 
   if (!confirmed) return;
@@ -971,10 +1133,14 @@ setInactiveMembers(
         active: false,
       },
     ].sort((memberA, memberB) =>
-      memberA.full_name.localeCompare(
-        memberB.full_name,
-        "es",
+     buildDisplayName(
+      memberA,
+    ).localeCompare(
+      buildDisplayName(
+        memberB,
       ),
+      "es",
+    ),
     ),
 );
 
@@ -1033,7 +1199,7 @@ if (reactivatingMemberId) {
   }
 
   const confirmed = window.confirm(
-    `¿Deseas reactivar a ${member.full_name}? Su historial de asistencia se conservará.`,
+    `¿Deseas reactivar a ${buildDisplayName(member)}? Su historial de asistencia se conservará.`
   );
 
   if (!confirmed) return;
@@ -1062,8 +1228,12 @@ if (reactivatingMemberId) {
           active: true,
         },
       ].sort((memberA, memberB) =>
-        memberA.full_name.localeCompare(
-          memberB.full_name,
+        buildDisplayName(
+          memberA,
+        ).localeCompare(
+          buildDisplayName(
+            memberB,
+          ),
           "es",
         ),
       ),
@@ -1409,11 +1579,17 @@ const loading =
     inactiveMemberSearch,
     setInactiveMemberSearch,
 
-    fullName,
-    setFullName,
+    firstName,
+setFirstName,
 
-    familyName,
-    setFamilyName,
+lastName,
+setLastName,
+
+marriedLastName,
+setMarriedLastName,
+
+familyName,
+setFamilyName,
 
     organization,
     setOrganization,

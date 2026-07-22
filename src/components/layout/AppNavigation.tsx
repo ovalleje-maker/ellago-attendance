@@ -14,9 +14,7 @@ export default function AppNavigation({
 }: AppNavigationProps) {
   return (
     <nav className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
-      <div
-  className="mx-auto grid max-w-5xl grid-cols-5"
->
+    <div className="mx-auto grid max-w-5xl grid-cols-3 sm:grid-cols-6">
       {canViewBishopDashboard && (
         <NavigationButton
           active={activeTab === "dashboard"}
@@ -63,6 +61,14 @@ export default function AppNavigation({
             )
           }
         />
+
+        <NavigationButton
+          active={activeTab === "account"}
+          label="Mi cuenta"
+          onClick={() =>
+            onTabChange("account")
+        }
+      />
       </div>
     </nav>
   );

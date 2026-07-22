@@ -3,6 +3,9 @@ import type {
 } from "@/types/attendance";
 import type { Member } from "@/types/member";
 import EmptyMessage from "@/components/ui/EmptyMessage";
+import {
+  buildDisplayName,
+} from "@/utils/memberNames";
 
 type AttendanceFollowUpProps = {
   members: Member[];
@@ -45,10 +48,14 @@ export default function AttendanceFollowUp({
       return (
         itemB.history.consecutiveAbsences -
           itemA.history.consecutiveAbsences ||
-        itemA.member.full_name.localeCompare(
-          itemB.member.full_name,
-          "es",
-        )
+       buildDisplayName(
+        itemA.member,
+      ).localeCompare(
+        buildDisplayName(
+          itemB.member,
+        ),
+        "es",
+      )
       );
     });
 
@@ -75,7 +82,7 @@ export default function AttendanceFollowUp({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-bold">
-                  {member.full_name}
+                  {buildDisplayName(member)}
                 </h3>
 
                 <p className="mt-1 text-sm text-slate-500">
