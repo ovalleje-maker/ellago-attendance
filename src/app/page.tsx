@@ -13,9 +13,22 @@ import AccountView from "@/components/account/AccountView";
 import {
   useAttendanceApp,
 } from "@/hooks/useAttendanceApp";
+import type {
+  Member,
+} from "@/types/member";
 
 export default function Home() {
   const app = useAttendanceApp();
+
+  async function handleMembersImported(
+  importedMembers: Member[],
+) {
+  app.addImportedMembers(
+    importedMembers,
+  );
+
+  await app.reloadInactiveMembers();
+}
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -154,6 +167,9 @@ export default function Home() {
         !app.selectedMember && (
           <MembersView
             members={app.members}
+            inactiveMembers={
+              app.inactiveMembers
+            }
             filteredMembers={
               app.filteredDirectoryMembers
             }
@@ -199,9 +215,9 @@ export default function Home() {
             onLastNameChange={
               app.setLastName
             }
-onMarriedLastNameChange={
-  app.setMarriedLastName
-}
+            onMarriedLastNameChange={
+              app.setMarriedLastName
+            }
             onFamilyNameChange={
               app.setFamilyName
             }
@@ -216,6 +232,9 @@ onMarriedLastNameChange={
             }
             onDeactivateMember={
               app.deactivateMember
+            }
+            onMembersImported={
+              handleMembersImported
             }
           />
         )}

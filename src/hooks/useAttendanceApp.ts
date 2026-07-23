@@ -816,6 +816,27 @@ setFamilyName("");
     }
   }
 
+  function addImportedMembers(
+  importedMembers: Member[],
+) {
+  setMembers(
+    (currentMembers) =>
+      [
+        ...currentMembers,
+        ...importedMembers,
+      ].sort(
+        (
+          memberA,
+          memberB,
+        ) =>
+          memberA.full_name.localeCompare(
+            memberB.full_name,
+            "es",
+          ),
+      ),
+  );
+}
+
   /*
    * ELIMINAR MIEMBRO
    */
@@ -1630,6 +1651,7 @@ setFamilyName,
     memberHistories,
 
     addMember,
+    addImportedMembers,
     startEditMember,
     cancelEditMember,
     saveMemberEdit,

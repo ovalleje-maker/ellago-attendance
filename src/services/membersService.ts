@@ -5,6 +5,34 @@ import type {
   Organization,
 } from "@/types/member";
 
+export type ImportMemberInput = {
+  firstName: string;
+  lastName: string;
+  marriedLastName: string;
+  familyName: string;
+  organization: Organization;
+  recentConvert: boolean;
+  active: boolean;
+};
+
+function buildImportedMemberFullName(
+  member: ImportMemberInput,
+): string {
+  const baseName = [
+    member.firstName,
+    member.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  if (!member.marriedLastName) {
+    return baseName;
+  }
+
+  return `${baseName} de ${member.marriedLastName}`;
+}
+
 export type NewMemberInput = {
   fullName: string;
 
@@ -212,4 +240,157 @@ export async function reactivateMember(
   if (error) {
     throw new Error(error.message);
   }
+}
+
+export async function reactivateImportedMember(
+  memberId: string,
+  input: ImportMemberInput,
+): Promise<Member> {
+  const { data, error } =
+    await supabase
+      .from("members")
+      .update({
+        full_name:
+          buildImportedMemberFullName(
+            input,
+          ),
+
+        first_name:
+          input.firstName.trim(),
+
+        last_name:
+          input.lastName.trim(),
+
+        married_last_name:
+          input.marriedLastName.trim() ||
+          null,
+
+        family_name:
+          input.familyName.trim() ||
+          null,
+
+        organization:
+          input.organization,
+
+        recent_convert:
+          input.recentConvert,
+
+        active: true,
+      })
+      .eq("id", memberId)
+      .select(MEMBER_COLUMNS)
+      .single();
+
+  if (error || !data) {
+    throw new Error(
+      error?.message ??
+        "No fue posible reactivar el miembro importado.",
+    );
+  }
+
+  return data as Member;
+}
+
+export async function importMembers(
+  members: ImportMemberInput[],
+): Promise<Member[]> {
+  if (members.length === 0) {
+    return [];
+  }
+
+  const memberRecords = members.map(
+    (member) => ({
+      full_name:
+        buildImportedMemberFullName(
+          member,
+        ),
+
+      first_name:
+        member.firstName.trim(),
+
+      last_name:
+        member.lastName.trim(),
+
+      married_last_name:
+        member.marriedLastName.trim() ||
+        null,
+
+      family_name:
+        member.familyName.trim() ||
+        null,
+
+      organization:
+        member.organization,
+
+      recent_convert:
+        member.recentConvert,
+
+      active:
+        member.active,
+    }),
+  );
+
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("members")
+    .insert(memberRecords)
+    .select();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as Member[];
+}
+
+export type ProcessImportMemberInput = {
+  member: ImportMemberInput;
+
+  existingInactiveMemberId?: string;
+};
+
+export async function processMemberImport(
+  rows: ProcessImportMemberInput[],
+): Promise<Member[]> {
+  const processedMembers: Member[] = [];
+
+  for (const row of rows) {
+    if (
+      row.existingInactiveMemberId
+    ) {
+      const reactivatedMember =
+        await reactivateImportedMember(
+          row.existingInactiveMemberId,
+          row.member,
+        );
+
+      processedMembers.push(
+        reactivatedMember,
+      );
+
+      continue;
+    }
+
+    const importedMembers =
+      await importMembers([
+        row.member,
+      ]);
+
+    const importedMember =
+      importedMembers[0];
+
+    if (!importedMember) {
+      throw new Error(
+        "No fue posible obtener el miembro importado.",
+      );
+    }
+
+    processedMembers.push(
+      importedMember,
+    );
+  }
+
+  return processedMembers;
 }
