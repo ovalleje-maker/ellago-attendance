@@ -42,15 +42,6 @@ import {
   getOrCreateMeeting,
 } from "@/services/meetingsService";
 
-import type {
-  Member,
-  Organization,
-} from "@/types/member";
-
-import type {
-  AppTab,
-} from "@/types/navigation";
-
 import {
   formatMeetingDate,
   getMostRecentSunday,
@@ -69,6 +60,26 @@ import {
   buildDisplayName,
   buildSortName,
 } from "@/utils/memberNames";
+
+import {
+  getMeetingVisitors,
+  registerVisitorAttendance,
+  removeMeetingVisitor,
+} from "@/services/visitorAttendanceService";
+
+import type {
+  Member,
+  Organization,
+} from "@/types/member";
+
+import type {
+  AppTab,
+} from "@/types/navigation";
+
+import type {
+  MeetingVisitorWithVisitor,
+  RegisterVisitorAttendanceInput,
+} from "@/types/visitor";
 
 function normalizeSearchText(
   value: string,
@@ -167,6 +178,30 @@ const isLeader = isOrganizationLeader(profile?.role);
 
   const [meetingId, setMeetingId] =
     useState<string | null>(null);
+
+  /*
+  * VISITANTES Y AMIGOS
+  */
+
+  const [
+    meetingVisitors,
+    setMeetingVisitors,
+  ] = useState<MeetingVisitorWithVisitor[]>([]);
+
+  const [
+    loadingMeetingVisitors,
+    setLoadingMeetingVisitors,
+  ] = useState(false);
+
+  const [
+    savingMeetingVisitor,
+    setSavingMeetingVisitor,
+  ] = useState(false);
+
+  const [
+    visitorError,
+    setVisitorError,
+  ] = useState<string | null>(null);
 
   /*
    * BÚSQUEDAS
@@ -1556,6 +1591,55 @@ if (reactivatingMemberId) {
   }
 
   /*
+  * FUNCION DE RECARGA
+  */
+
+const reloadMeetingVisitors = useCallback(
+  async (
+    requestedMeetingId?: string | null,
+  ): Promise<void> => {
+    const resolvedMeetingId =
+      requestedMeetingId ?? meetingId;
+
+    if (!resolvedMeetingId) {
+      setMeetingVisitors([]);
+      setVisitorError(null);
+      return;
+    }
+
+    setLoadingMeetingVisitors(true);
+    setVisitorError(null);
+
+    try {
+      const visitors =
+        await getMeetingVisitors(
+          resolvedMeetingId,
+        );
+
+      setMeetingVisitors(visitors);
+    } catch (error) {
+      console.error(
+        "Error loading meeting visitors:",
+        error,
+      );
+
+      setMeetingVisitors([]);
+
+      setVisitorError(
+        "No se pudo cargar la asistencia de visitantes.",
+      );
+    } finally {
+      setLoadingMeetingVisitors(false);
+    }
+  },
+  [meetingId],
+);
+
+useEffect(() => {
+  void reloadMeetingVisitors();
+}, [reloadMeetingVisitors]);
+
+  /*
    * ESTADO GLOBAL DE CARGA
    */
 
@@ -1565,6 +1649,84 @@ const loading =
   loadingAttendance ||
   loadingProfile ||
   loadingHistory;
+
+  async function handleRegisterVisitorAttendance(
+  input: RegisterVisitorAttendanceInput,
+): Promise<boolean> {
+  const resolvedMeetingId =
+    input.meeting_id || meetingId;
+
+  if (!resolvedMeetingId) {
+    setVisitorError(
+      "Primero debes seleccionar o crear una reunión.",
+    );
+
+    return false;
+  }
+
+  setSavingMeetingVisitor(true);
+  setVisitorError(null);
+
+  try {
+    await registerVisitorAttendance({
+      ...input,
+      meeting_id: resolvedMeetingId,
+    });
+
+    await reloadMeetingVisitors(
+      resolvedMeetingId,
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "Error registering visitor attendance:",
+      error,
+    );
+
+    setVisitorError(
+      "No se pudo registrar la asistencia del visitante.",
+    );
+
+    return false;
+  } finally {
+    setSavingMeetingVisitor(false);
+  }
+}
+
+async function handleRemoveMeetingVisitor(
+  meetingVisitorId: string,
+): Promise<boolean> {
+  if (!meetingVisitorId) {
+    return false;
+  }
+
+  setSavingMeetingVisitor(true);
+  setVisitorError(null);
+
+  try {
+    await removeMeetingVisitor(
+      meetingVisitorId,
+    );
+
+    await reloadMeetingVisitors();
+
+    return true;
+  } catch (error) {
+    console.error(
+      "Error removing visitor attendance:",
+      error,
+    );
+
+    setVisitorError(
+      "No se pudo eliminar la asistencia del visitante.",
+    );
+
+    return false;
+  } finally {
+    setSavingMeetingVisitor(false);
+  }
+}
 
   /*
    * DATOS Y FUNCIONES DISPONIBLES
@@ -1590,6 +1752,7 @@ const loading =
 
     meetingDate,
     setMeetingDate,
+    meetingId,
 
     attendanceSearch,
     setAttendanceSearch,
@@ -1601,16 +1764,16 @@ const loading =
     setInactiveMemberSearch,
 
     firstName,
-setFirstName,
+    setFirstName,
 
-lastName,
-setLastName,
+    lastName,
+    setLastName,
 
-marriedLastName,
-setMarriedLastName,
+    marriedLastName,
+    setMarriedLastName,
 
-familyName,
-setFamilyName,
+    familyName,
+    setFamilyName,
 
     organization,
     setOrganization,
@@ -1663,9 +1826,17 @@ setFamilyName,
 
     reloadMembers: loadMembers,
     reloadInactiveMembers:
-  loadInactiveMembers,
+    loadInactiveMembers,
     reloadMeetingAndAttendance:
       loadMeetingAndAttendance,
     reloadHistory,
+
+    meetingVisitors,
+    loadingMeetingVisitors,
+    savingMeetingVisitor,
+    visitorError,
+    reloadMeetingVisitors,
+    handleRegisterVisitorAttendance,
+    handleRemoveMeetingVisitor,
   };
 }

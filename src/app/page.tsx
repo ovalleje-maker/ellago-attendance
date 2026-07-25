@@ -143,6 +143,25 @@ export default function Home() {
             onToggleFamily={
               app.markWholeFamily
             }
+            meetingId={app.meetingId}
+            meetingVisitors={
+              app.meetingVisitors
+            }
+            loadingMeetingVisitors={
+              app.loadingMeetingVisitors
+            }
+            savingMeetingVisitor={
+              app.savingMeetingVisitor
+            }
+            visitorError={
+              app.visitorError
+            }
+            handleRegisterVisitorAttendance={
+              app.handleRegisterVisitorAttendance
+            }
+            handleRemoveMeetingVisitor={
+              app.handleRemoveMeetingVisitor
+            }
           />
         )}
 

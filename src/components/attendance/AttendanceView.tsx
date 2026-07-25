@@ -2,11 +2,16 @@ import AttendanceMemberList from "@/components/attendance/AttendanceMemberList";
 import FamilyAttendanceList from "@/components/attendance/FamilyAttendanceList";
 import MetricCard from "@/components/ui/MetricCard";
 import type { Member } from "@/types/member";
+import VisitorAttendanceSection from "./VisitorAttendanceSection";
 import {
   formatMeetingDate,
   getPreviousOrSameSunday,
   isSunday,
 } from "@/utils/dates";
+import type {
+  MeetingVisitorWithVisitor,
+  RegisterVisitorAttendanceInput,
+} from "@/types/visitor";
 
 type FamilyGroup = [
   familyName: string,
@@ -15,6 +20,7 @@ type FamilyGroup = [
 
 type AttendanceViewProps = {
   meetingDate: string;
+  meetingId: string | null;
   attendanceSearch: string;
 
   members: Member[];
@@ -31,6 +37,19 @@ type AttendanceViewProps = {
   loadingMembers: boolean;
   loadingAttendance: boolean;
   canRecordAttendance: boolean;
+
+  meetingVisitors: MeetingVisitorWithVisitor[];
+  loadingMeetingVisitors: boolean;
+  savingMeetingVisitor: boolean;
+  visitorError: string | null;
+
+  handleRegisterVisitorAttendance: (
+    input: RegisterVisitorAttendanceInput,
+  ) => Promise<boolean>;
+
+  handleRemoveMeetingVisitor: (
+    meetingVisitorId: string,
+  ) => Promise<boolean>;
 
   onMeetingDateChange: (
     value: string,
@@ -53,6 +72,7 @@ type AttendanceViewProps = {
 
 export default function AttendanceView({
   meetingDate,
+  meetingId,
   attendanceSearch,
   members,
   filteredMembers,
@@ -70,6 +90,12 @@ export default function AttendanceView({
   onClearAttendance,
   onToggleAttendance,
   onToggleFamily,
+  meetingVisitors,
+  loadingMeetingVisitors,
+  savingMeetingVisitor,
+  visitorError,
+  handleRegisterVisitorAttendance,
+  handleRemoveMeetingVisitor,
 }: AttendanceViewProps) {
     function handleDateChange(
   selectedDate: string,
@@ -197,6 +223,26 @@ export default function AttendanceView({
         }
         onToggleFamily={onToggleFamily}
       />
+
+      <div className="mt-6">
+        <VisitorAttendanceSection
+          meetingId={meetingId}
+          meetingVisitors={meetingVisitors}
+          loadingMeetingVisitors={
+            loadingMeetingVisitors
+          }
+          savingMeetingVisitor={
+            savingMeetingVisitor
+          }
+          visitorError={visitorError}
+          onRegisterVisitor={
+            handleRegisterVisitorAttendance
+          }
+          onRemoveVisitor={
+            handleRemoveMeetingVisitor
+          }
+        />
+      </div>
     </section>
   );
 }
