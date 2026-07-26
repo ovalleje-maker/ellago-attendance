@@ -12,5 +12,6 @@ export type AppTab =
   | "attendance"
   | "summary"
   | "members"
+  | "visitors"
   | "inactive-members"
   | "account";

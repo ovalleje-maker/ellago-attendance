@@ -12,13 +12,15 @@ import type {
 } from "@/types/visitor";
 
 /**
- * Obtiene todos los visitantes activos.
+ * Obtiene visitantes según su estado.
  */
-export async function getVisitors(): Promise<Visitor[]> {
+export async function getVisitorsByStatus(
+  active: boolean,
+): Promise<Visitor[]> {
   const { data, error } = await supabase
     .from("visitors")
     .select("*")
-    .eq("active", true)
+    .eq("active", active)
     .order("full_name");
 
   if (error) {
@@ -26,6 +28,20 @@ export async function getVisitors(): Promise<Visitor[]> {
   }
 
   return data satisfies Visitor[];
+}
+
+/**
+ * Obtiene todos los visitantes activos.
+ */
+export async function getVisitors(): Promise<Visitor[]> {
+  return getVisitorsByStatus(true);
+}
+
+/**
+ * Obtiene todos los visitantes inactivos.
+ */
+export async function getInactiveVisitors(): Promise<Visitor[]> {
+  return getVisitorsByStatus(false);
 }
 
 /**
@@ -103,6 +119,28 @@ export async function deactivateVisitor(
   if (error) {
     throw error;
   }
+}
+
+/**
+ * Reactiva un visitante.
+ */
+export async function reactivateVisitor(
+  visitorId: string,
+): Promise<Visitor> {
+  const { data, error } = await supabase
+    .from("visitors")
+    .update({
+      active: true,
+    })
+    .eq("id", visitorId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data satisfies Visitor;
 }
 
 /**
@@ -308,6 +346,28 @@ export async function getOrCreateVisitor(
 }
 
 /**
+ * Verifica si un visitante ya está registrado
+ * en una reunión.
+ */
+export async function isVisitorRegisteredInMeeting(
+  meetingId: string,
+  visitorId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("meeting_visitors")
+    .select("id")
+    .eq("meeting_id", meetingId)
+    .eq("visitor_id", visitorId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data !== null;
+}
+
+/**
  * Crea o reutiliza la ficha de un visitante
  * y registra su asistencia a una reunión.
  */
@@ -319,6 +379,23 @@ export async function registerVisitorAttendance(
     phone: input.phone,
     notes: input.visitor_notes,
   });
+
+  const alreadyRegistered =
+  await isVisitorRegisteredInMeeting(
+    input.meeting_id,
+    visitor.id,
+  );
+
+if (alreadyRegistered) {
+  const duplicateError = new Error(
+    "Esta persona ya está registrada en la reunión seleccionada.",
+  ) as Error & { code?: string };
+
+  duplicateError.code =
+    "VISITOR_ALREADY_REGISTERED";
+
+  throw duplicateError;
+}
 
   const meetingVisitor =
     await registerMeetingVisitor({

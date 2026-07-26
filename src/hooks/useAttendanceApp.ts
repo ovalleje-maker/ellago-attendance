@@ -62,9 +62,14 @@ import {
 } from "@/utils/memberNames";
 
 import {
+  deactivateVisitor,
+  getInactiveVisitors,
   getMeetingVisitors,
+  getVisitors,
+  reactivateVisitor,
   registerVisitorAttendance,
   removeMeetingVisitor,
+  updateVisitor,
 } from "@/services/visitorAttendanceService";
 
 import type {
@@ -79,6 +84,7 @@ import type {
 import type {
   MeetingVisitorWithVisitor,
   RegisterVisitorAttendanceInput,
+  Visitor,
 } from "@/types/visitor";
 
 function normalizeSearchText(
@@ -189,6 +195,26 @@ const isLeader = isOrganizationLeader(profile?.role);
   ] = useState<MeetingVisitorWithVisitor[]>([]);
 
   const [
+    visitors,
+    setVisitors,
+  ] = useState<Visitor[]>([]);
+
+  const [
+  inactiveVisitors,
+  setInactiveVisitors,
+] = useState<Visitor[]>([]);
+
+  const [
+    loadingVisitors,
+    setLoadingVisitors,
+  ] = useState(true);
+
+  const [
+  loadingInactiveVisitors,
+  setLoadingInactiveVisitors,
+] = useState(true);
+
+  const [
     loadingMeetingVisitors,
     setLoadingMeetingVisitors,
   ] = useState(false);
@@ -197,6 +223,21 @@ const isLeader = isOrganizationLeader(profile?.role);
     savingMeetingVisitor,
     setSavingMeetingVisitor,
   ] = useState(false);
+
+  const [
+  savingVisitorEdit,
+  setSavingVisitorEdit,
+] = useState(false);
+
+const [
+  deactivatingVisitorId,
+  setDeactivatingVisitorId,
+] = useState<string | null>(null);
+
+const [
+  reactivatingVisitorId,
+  setReactivatingVisitorId,
+] = useState<string | null>(null);
 
   const [
     visitorError,
@@ -1639,6 +1680,68 @@ useEffect(() => {
   void reloadMeetingVisitors();
 }, [reloadMeetingVisitors]);
 
+const reloadVisitors =
+  useCallback(async (): Promise<void> => {
+    setLoadingVisitors(true);
+    setVisitorError(null);
+
+    try {
+      const loadedVisitors =
+        await getVisitors();
+
+      setVisitors(loadedVisitors);
+    } catch (error) {
+      console.error(
+        "Error loading visitors:",
+        error,
+      );
+
+      setVisitors([]);
+
+      setVisitorError(
+        "No se pudo cargar el directorio de visitantes.",
+      );
+    } finally {
+      setLoadingVisitors(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reloadVisitors();
+  }, [reloadVisitors]);
+
+  const reloadInactiveVisitors =
+  useCallback(async (): Promise<void> => {
+    setLoadingInactiveVisitors(true);
+    setVisitorError(null);
+
+    try {
+      const loadedInactiveVisitors =
+        await getInactiveVisitors();
+
+      setInactiveVisitors(
+        loadedInactiveVisitors,
+      );
+    } catch (error) {
+      console.error(
+        "Error loading inactive visitors:",
+        error,
+      );
+
+      setInactiveVisitors([]);
+
+      setVisitorError(
+        "No se pudieron cargar los visitantes inactivos.",
+      );
+    } finally {
+      setLoadingInactiveVisitors(false);
+    }
+  }, []);
+
+  useEffect(() => {
+  void reloadInactiveVisitors();
+}, [reloadInactiveVisitors]);
+
   /*
    * ESTADO GLOBAL DE CARGA
    */
@@ -1650,9 +1753,48 @@ const loading =
   loadingProfile ||
   loadingHistory;
 
+  function isDuplicateMeetingVisitorError(
+  error: unknown,
+): boolean {
+  if (
+    typeof error !== "object" ||
+    error === null
+  ) {
+    return false;
+  }
+
+  const possibleError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+  };
+
+  return (
+    possibleError.code === "23505" ||
+    possibleError.code ===
+      "VISITOR_ALREADY_REGISTERED" ||
+    possibleError.message
+      ?.toLowerCase()
+      .includes("duplicate") === true ||
+    possibleError.message
+      ?.toLowerCase()
+      .includes("ya está registrada") === true ||
+    possibleError.details
+      ?.toLowerCase()
+      .includes("already exists") === true
+  );
+}
+
   async function handleRegisterVisitorAttendance(
   input: RegisterVisitorAttendanceInput,
 ): Promise<boolean> {
+  if (!canRecordAttendance) {
+  setVisitorError(
+    "Tu cuenta no tiene permiso para registrar asistencia de visitantes.",
+  );
+
+  return false;
+}
   const resolvedMeetingId =
     input.meeting_id || meetingId;
 
@@ -1677,19 +1819,33 @@ const loading =
       resolvedMeetingId,
     );
 
+    await reloadVisitors();
+
     return true;
   } catch (error) {
-    console.error(
-      "Error registering visitor attendance:",
-      error,
-    );
+  console.error(
+    "Error registering visitor attendance:",
+    error,
+  );
 
+  if (
+    isDuplicateMeetingVisitorError(
+      error,
+    )
+  ) {
     setVisitorError(
-      "No se pudo registrar la asistencia del visitante.",
+      "Esta persona ya está registrada en la reunión seleccionada.",
     );
 
     return false;
-  } finally {
+  }
+
+  setVisitorError(
+    "No se pudo registrar la asistencia del visitante.",
+  );
+
+  return false;
+} finally {
     setSavingMeetingVisitor(false);
   }
 }
@@ -1697,6 +1853,13 @@ const loading =
 async function handleRemoveMeetingVisitor(
   meetingVisitorId: string,
 ): Promise<boolean> {
+  if (!canRecordAttendance) {
+  setVisitorError(
+    "Tu cuenta no tiene permiso para quitar visitantes de la asistencia.",
+  );
+
+  return false;
+}
   if (!meetingVisitorId) {
     return false;
   }
@@ -1727,6 +1890,154 @@ async function handleRemoveMeetingVisitor(
     setSavingMeetingVisitor(false);
   }
 }
+
+const saveVisitorEdit =
+  useCallback(
+    async (
+      visitor: Visitor,
+    ): Promise<boolean> => {
+      if (!canManageMembers) {
+        setVisitorError(
+          "Tu cuenta no tiene permiso para editar visitantes.",
+        );
+
+        return false;
+      }
+      setSavingVisitorEdit(true);
+      setVisitorError(null);
+
+      try {
+        await updateVisitor(visitor.id, {
+          full_name:
+            visitor.full_name,
+          phone: visitor.phone,
+        });
+
+        await reloadVisitors();
+
+        return true;
+      } catch (error) {
+        console.error(
+          "Error updating visitor:",
+          error,
+        );
+
+        setVisitorError(
+          "No se pudo actualizar el visitante.",
+        );
+
+        return false;
+      } finally {
+        setSavingVisitorEdit(false);
+      }
+    },
+    [
+      canManageMembers,
+      reloadVisitors,
+    ]
+  );
+
+  const handleDeactivateVisitor =
+  useCallback(
+    async (
+      visitorId: string,
+    ): Promise<boolean> => {
+      if (!canManageMembers) {
+        setVisitorError(
+          "Tu cuenta no tiene permiso para desactivar visitantes.",
+        );
+
+        return false;
+      }
+      setDeactivatingVisitorId(
+        visitorId,
+      );
+
+      setVisitorError(null);
+
+      try {
+        await deactivateVisitor(
+          visitorId,
+        );
+
+        await Promise.all([
+          reloadVisitors(),
+          reloadInactiveVisitors(),
+        ]);
+
+        return true;
+      } catch (error) {
+        console.error(
+          "Error deactivating visitor:",
+          error,
+        );
+
+        setVisitorError(
+          "No se pudo desactivar el visitante.",
+        );
+
+        return false;
+      } finally {
+        setDeactivatingVisitorId(null);
+      }
+    },
+    [
+      canManageMembers,
+      reloadVisitors,
+      reloadInactiveVisitors,
+    ],
+  );
+
+  const handleReactivateVisitor =
+  useCallback(
+    async (
+      visitorId: string,
+    ): Promise<boolean> => {
+      if (!canManageMembers) {
+        setVisitorError(
+          "Tu cuenta no tiene permiso para reactivar visitantes.",
+        );
+
+        return false;
+      }
+      setReactivatingVisitorId(
+        visitorId,
+      );
+
+      setVisitorError(null);
+
+      try {
+        await reactivateVisitor(
+          visitorId,
+        );
+
+        await Promise.all([
+          reloadVisitors(),
+          reloadInactiveVisitors(),
+        ]);
+
+        return true;
+      } catch (error) {
+        console.error(
+          "Error reactivating visitor:",
+          error,
+        );
+
+        setVisitorError(
+          "No se pudo reactivar el visitante.",
+        );
+
+        return false;
+      } finally {
+        setReactivatingVisitorId(null);
+      }
+    },
+    [
+      canManageMembers,
+      reloadVisitors,
+      reloadInactiveVisitors,
+    ],
+  );
 
   /*
    * DATOS Y FUNCIONES DISPONIBLES
@@ -1831,6 +2142,9 @@ async function handleRemoveMeetingVisitor(
       loadMeetingAndAttendance,
     reloadHistory,
 
+    visitors,
+    loadingVisitors,
+    reloadVisitors,
     meetingVisitors,
     loadingMeetingVisitors,
     savingMeetingVisitor,
@@ -1838,5 +2152,14 @@ async function handleRemoveMeetingVisitor(
     reloadMeetingVisitors,
     handleRegisterVisitorAttendance,
     handleRemoveMeetingVisitor,
+    savingVisitorEdit,
+    saveVisitorEdit,
+    deactivatingVisitorId,
+    handleDeactivateVisitor,
+    inactiveVisitors,
+    loadingInactiveVisitors,
+    reactivatingVisitorId,
+    reloadInactiveVisitors,
+    handleReactivateVisitor,
   };
 }

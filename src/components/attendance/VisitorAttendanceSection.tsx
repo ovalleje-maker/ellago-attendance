@@ -12,8 +12,11 @@ import type {
   VisitorType,
 } from "@/types/visitor";
 
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+
 interface VisitorAttendanceSectionProps {
   meetingId: string | null;
+  canRecordAttendance: boolean;
   meetingVisitors: MeetingVisitorWithVisitor[];
   loadingMeetingVisitors: boolean;
   savingMeetingVisitor: boolean;
@@ -30,6 +33,7 @@ interface VisitorAttendanceSectionProps {
 
 export default function VisitorAttendanceSection({
   meetingId,
+  canRecordAttendance,
   meetingVisitors,
   loadingMeetingVisitors,
   savingMeetingVisitor,
@@ -60,6 +64,13 @@ export default function VisitorAttendanceSection({
     removingVisitorId,
     setRemovingVisitorId,
   ] = useState<string | null>(null);
+
+  const [
+  pendingRemoval,
+  setPendingRemoval,
+] = useState<
+  MeetingVisitorWithVisitor | null
+>(null);
 
   const sortedVisitors = useMemo(
     () =>
@@ -111,33 +122,33 @@ export default function VisitorAttendanceSection({
     setAttendanceNotes("");
   }
 
-  async function handleRemoveVisitor(
-    meetingVisitorId: string,
-  ): Promise<void> {
-    const confirmed = window.confirm(
-      "¿Deseas quitar a esta persona de la asistencia de esta reunión?",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setRemovingVisitorId(
-      meetingVisitorId,
-    );
-
-    try {
-      await onRemoveVisitor(
-        meetingVisitorId,
-      );
-    } finally {
-      setRemovingVisitorId(null);
-    }
+  async function confirmRemoveVisitor(): Promise<void> {
+  if (!pendingRemoval) {
+    return;
   }
 
+  setRemovingVisitorId(
+    pendingRemoval.id,
+  );
+
+  try {
+    const success =
+      await onRemoveVisitor(
+        pendingRemoval.id,
+      );
+
+    if (success) {
+      setPendingRemoval(null);
+    }
+  } finally {
+    setRemovingVisitorId(null);
+  }
+}
+
   const formDisabled =
-    !meetingId ||
-    savingMeetingVisitor;
+  !meetingId ||
+  !canRecordAttendance ||
+  savingMeetingVisitor;
 
   return (
     <section className="space-y-6">
@@ -159,6 +170,15 @@ export default function VisitorAttendanceSection({
           para registrar visitantes.
         </div>
       ) : null}
+
+      {meetingId &&
+        !canRecordAttendance ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Puedes consultar los visitantes de esta
+            reunión, pero tu cuenta no tiene permiso
+            para registrar o quitar personas.
+        </div>
+        ) : null}
 
       <form
         onSubmit={handleSubmit}
@@ -380,14 +400,15 @@ export default function VisitorAttendanceSection({
                     <button
                       type="button"
                       disabled={
+                        !canRecordAttendance ||
                         savingMeetingVisitor ||
                         isRemoving
-                      }
+                        }
                       onClick={() =>
-                        void handleRemoveVisitor(
-                          meetingVisitor.id,
+                        setPendingRemoval(
+                            meetingVisitor,
                         )
-                      }
+                        }
                       className="shrink-0 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isRemoving
@@ -401,6 +422,29 @@ export default function VisitorAttendanceSection({
           </ul>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        title="Quitar visitante"
+        message={
+            pendingRemoval
+            ? `¿Deseas quitar a ${pendingRemoval.visitor.full_name} de la asistencia de esta reunión?`
+            : ""
+        }
+        confirmLabel="Quitar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        loading={
+            pendingRemoval !== null &&
+            removingVisitorId ===
+            pendingRemoval.id
+        }
+        onCancel={() => {
+            setPendingRemoval(null);
+        }}
+        onConfirm={() => {
+            void confirmRemoveVisitor();
+        }}
+        />
     </section>
   );
 }

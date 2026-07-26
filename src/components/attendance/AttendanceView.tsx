@@ -97,25 +97,90 @@ export default function AttendanceView({
   handleRegisterVisitorAttendance,
   handleRemoveMeetingVisitor,
 }: AttendanceViewProps) {
-    function handleDateChange(
-  selectedDate: string,
-) {
-  if (!selectedDate) return;
+  function handleDateChange(
+    selectedDate: string,
+  ) {
+    if (!selectedDate) {
+      return;
+    }
 
-  if (isSunday(selectedDate)) {
-    onMeetingDateChange(selectedDate);
-    return;
+    if (isSunday(selectedDate)) {
+      onMeetingDateChange(
+        selectedDate,
+      );
+
+      return;
+    }
+
+    const correctedSunday =
+      getPreviousOrSameSunday(
+        selectedDate,
+      );
+
+    window.alert(
+      "La reunión sacramental debe registrarse en domingo. La fecha se cambió al domingo anterior.",
+    );
+
+    onMeetingDateChange(
+      correctedSunday,
+    );
   }
 
-  const correctedSunday =
-    getPreviousOrSameSunday(selectedDate);
+  const normalizedSearch =
+    attendanceSearch
+      .trim()
+      .toLowerCase();
 
-  window.alert(
-    "La reunión sacramental debe registrarse en domingo. La fecha se cambió al domingo anterior.",
-  );
+  const filteredFamilies =
+    normalizedSearch
+      ? families.filter(
+          ([
+            familyName,
+            familyMembers,
+          ]) => {
+            const familyMatches =
+              familyName
+                .toLowerCase()
+                .includes(
+                  normalizedSearch,
+                );
 
-  onMeetingDateChange(correctedSunday);
-}
+            const memberMatches =
+              familyMembers.some(
+                (member) => {
+                  const fullName = [
+                    member.first_name,
+                    member.last_name,
+                    member.married_last_name,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
+                    .toLowerCase();
+
+                  const organization =
+                    member.organization
+                      ?.toLowerCase() ??
+                    "";
+
+                  return (
+                    fullName.includes(
+                      normalizedSearch,
+                    ) ||
+                    organization.includes(
+                      normalizedSearch,
+                    )
+                  );
+                },
+              );
+
+            return (
+              familyMatches ||
+              memberMatches
+            );
+          },
+        )
+      : families;
+
   return (
     <section>
       <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -132,25 +197,34 @@ export default function AttendanceView({
           value={meetingDate}
           disabled={loadingAttendance}
           onChange={(event) =>
-  handleDateChange(event.target.value)
-}
+            handleDateChange(
+              event.target.value,
+            )
+          }
           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-700 disabled:bg-slate-100 sm:max-w-xs"
         />
 
         <p className="mt-2 text-sm capitalize text-slate-500">
-          {formatMeetingDate(meetingDate)}
-          Solo se permiten fechas de domingo.
+          {formatMeetingDate(
+            meetingDate,
+          )}{" "}
+          Solo se permiten fechas de
+          domingo.
         </p>
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
         <MetricCard
-          number={presentMembers.length}
+          number={
+            presentMembers.length
+          }
           label="Presentes"
         />
 
         <MetricCard
-          number={absentMembers.length}
+          number={
+            absentMembers.length
+          }
           label="Ausentes"
         />
 
@@ -176,11 +250,14 @@ export default function AttendanceView({
 
           <button
             type="button"
-            onClick={onClearAttendance}
+            onClick={
+              onClearAttendance
+            }
             disabled={
               !canRecordAttendance ||
               loadingAttendance ||
-              presentMemberIds.size === 0
+              presentMemberIds.size ===
+                0
             }
             className="rounded-xl border border-red-300 px-4 py-3 font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -190,15 +267,21 @@ export default function AttendanceView({
       </div>
 
       <AttendanceMemberList
-        members={filteredMembers}
-        totalMembers={members.length}
+        members={
+          filteredMembers
+        }
+        totalMembers={
+          members.length
+        }
         presentMemberIds={
           presentMemberIds
         }
         changingAttendance={
           changingAttendance
         }
-        loadingMembers={loadingMembers}
+        loadingMembers={
+          loadingMembers
+        }
         loadingAttendance={
           loadingAttendance
         }
@@ -211,7 +294,9 @@ export default function AttendanceView({
       />
 
       <FamilyAttendanceList
-        families={families}
+        families={
+          filteredFamilies
+        }
         presentMemberIds={
           presentMemberIds
         }
@@ -221,20 +306,29 @@ export default function AttendanceView({
         canRecordAttendance={
           canRecordAttendance
         }
-        onToggleFamily={onToggleFamily}
+        onToggleFamily={
+          onToggleFamily
+        }
       />
 
       <div className="mt-6">
         <VisitorAttendanceSection
           meetingId={meetingId}
-          meetingVisitors={meetingVisitors}
+          canRecordAttendance={
+            canRecordAttendance
+          }
+          meetingVisitors={
+            meetingVisitors
+          }
           loadingMeetingVisitors={
             loadingMeetingVisitors
           }
           savingMeetingVisitor={
             savingMeetingVisitor
           }
-          visitorError={visitorError}
+          visitorError={
+            visitorError
+          }
           onRegisterVisitor={
             handleRegisterVisitorAttendance
           }
