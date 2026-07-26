@@ -213,24 +213,33 @@ export default function AttendanceView({
         </p>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <MetricCard
-          number={
-            presentMembers.length
-          }
-          label="Presentes"
+          number={presentMembers.length}
+          label="Miembros presentes"
+        />
+
+        <MetricCard
+          number={meetingVisitors.length}
+          label="Visitantes"
         />
 
         <MetricCard
           number={
-            absentMembers.length
+            presentMembers.length +
+            meetingVisitors.length
           }
-          label="Ausentes"
+          label="Total asistentes"
+        />
+
+        <MetricCard
+          number={absentMembers.length}
+          label="Miembros ausentes"
         />
 
         <MetricCard
           number={`${attendancePercentage}%`}
-          label="Asistencia"
+          label="Asistencia de miembros"
         />
       </div>
 

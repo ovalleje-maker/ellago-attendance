@@ -224,6 +224,9 @@ export default function Home() {
               absentMembers={
                 app.absentMembers
               }
+              meetingVisitors={
+                app.meetingVisitors
+              }
               attendancePercentage={
                 app.attendancePercentage
               }
